@@ -1,0 +1,7 @@
+python-jobspy
+httpx
+requests
+beautifulsoup4
+azure-storage-blob
+playwright
+resend

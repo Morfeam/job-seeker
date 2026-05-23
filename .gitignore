@@ -1,0 +1,40 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+*.cert
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Docker
+*.dockerignore
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
