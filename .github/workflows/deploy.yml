@@ -1,0 +1,102 @@
+name: Deploy Job Seeker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-infra:
+    runs-on: ubuntu-latest
+    outputs:
+      CONTAINER_LOGINSERVER: ${{ steps.deploy-bicep.outputs.CONTAINER_LOGINSERVER }}
+      CONTAINER_APP_ENVIRONMENT_ID: ${{ steps.deploy-bicep.outputs.CONTAINER_APP_ENVIRONMENT_ID }}
+      MANAGED_IDENTITY_ID: ${{ steps.deploy-bicep.outputs.MANAGED_IDENTITY_ID }}
+      MANAGED_IDENTITY_CLIENT_ID: ${{ steps.deploy-bicep.outputs.MANAGED_IDENTITY_CLIENT_ID }}
+      KEY_VAULT_URI: ${{ steps.deploy-bicep.outputs.KEY_VAULT_URI }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Infrastructure
+        id: deploy-bicep
+        run: |
+          OUTPUT=$(az deployment group create \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --template-file ./bicep-templates/main.bicep \
+            --parameters \
+              location=${{ vars.AZURE_DEFAULT_LOCATION }} \
+              environment=dev \
+              keyVaultAdminObjectId=${{ secrets.KEY_VAULT_ADMIN_OBJECT_ID }} \
+            --query properties.outputs \
+            -o json)
+          echo "CONTAINER_LOGINSERVER=$(echo $OUTPUT | jq -r '.loginServer.value')" >> $GITHUB_OUTPUT
+          echo "CONTAINER_APP_ENVIRONMENT_ID=$(echo $OUTPUT | jq -r '.containerAppEnvironmentId.value')" >> $GITHUB_OUTPUT
+          echo "MANAGED_IDENTITY_ID=$(echo $OUTPUT | jq -r '.managedIdentityId.value')" >> $GITHUB_OUTPUT
+          echo "MANAGED_IDENTITY_CLIENT_ID=$(echo $OUTPUT | jq -r '.managedIdentityClientId.value')" >> $GITHUB_OUTPUT
+          echo "KEY_VAULT_URI=$(echo $OUTPUT | jq -r '.keyVaultUri.value')" >> $GITHUB_OUTPUT
+
+  publish-docker:
+    runs-on: ubuntu-latest
+    needs: deploy-infra
+    env:
+      CONTAINER_LOGINSERVER: ${{ needs.deploy-infra.outputs.CONTAINER_LOGINSERVER }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name ${{ env.CONTAINER_LOGINSERVER }}
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.CONTAINER_LOGINSERVER }}/job-seeker
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            type=raw,value=github-${{ github.run_id }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Deploy Container Job
+        run: |
+          IMAGE_NAME="${{ env.CONTAINER_LOGINSERVER }}/job-seeker:github-${{ github.run_id }}"
+          MANAGED_IDENTITY_ID="${{ needs.deploy-infra.outputs.MANAGED_IDENTITY_ID }}"
+          KEY_VAULT_URI="${{ needs.deploy-infra.outputs.KEY_VAULT_URI }}"
+          az deployment group create \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --template-file ./bicep-templates/container-job.bicep \
+            --parameters \
+              location=${{ vars.AZURE_DEFAULT_LOCATION }} \
+              environment=dev \
+              imageName="$IMAGE_NAME" \
+              loginServer=${{ env.CONTAINER_LOGINSERVER }} \
+              containerAppEnvironmentId=${{ needs.deploy-infra.outputs.CONTAINER_APP_ENVIRONMENT_ID }} \
+              managedIdentityId="$MANAGED_IDENTITY_ID" \
+              managedIdentityClientId=${{ needs.deploy-infra.outputs.MANAGED_IDENTITY_CLIENT_ID }} \
+              keyVaultUri="$KEY_VAULT_URI"
+
+      - name: Disable Container Job Schedule
+        run: |
+          az containerapp job update \
+            --name "job-seeker-job-dev" \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --cron-expression "0 0 30 2 *"

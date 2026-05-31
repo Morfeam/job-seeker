@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 from datetime import datetime, timezone
 
 from scrapers.ziprecruiter import scrape_ziprecruiter
@@ -27,7 +28,7 @@ def setup_and_parse_args() -> argparse.Namespace:
                         metavar="BOOL", help="Scrape LinkedIn (default: false, not implemented)")
     parser.add_argument("--what-if", type=_bool_arg, default=False,
                         metavar="BOOL", help="Dry run — skip Azure writes and email (default: false)")
-    parser.add_argument("--email", type=str, default="",
+    parser.add_argument("--email", type=str, default=os.environ.get('RECIPIENT_EMAIL', ''),
                         help="Recipient email address for results notification")
     return parser.parse_args()
 
