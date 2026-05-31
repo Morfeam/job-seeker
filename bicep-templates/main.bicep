@@ -28,7 +28,6 @@ resource keyVault 'Microsoft.KeyVault/vaults@2024-12-01-preview' = {
     tenantId: subscription().tenantId
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
-    enablePurgeProtection: false
     accessPolicies: [
       {
         tenantId: subscription().tenantId

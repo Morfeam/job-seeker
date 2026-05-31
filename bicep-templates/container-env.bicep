@@ -23,7 +23,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   location: location
   properties: {
     sku: {
-      name: 'Free'
+      name: 'PerGB2018'
     }
     retentionInDays: 30
     publicNetworkAccessForIngestion: 'Enabled'
