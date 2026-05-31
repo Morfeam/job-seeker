@@ -93,3 +93,10 @@ jobs:
               managedIdentityId="$MANAGED_IDENTITY_ID" \
               managedIdentityClientId=${{ needs.deploy-infra.outputs.MANAGED_IDENTITY_CLIENT_ID }} \
               keyVaultUri="$KEY_VAULT_URI"
+
+      - name: Disable Container Job Schedule
+        run: |
+          az containerapp job update \
+            --name "job-seeker-job-dev" \
+            --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
+            --cron-expression "0 0 30 2 *"
