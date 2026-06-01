@@ -77,7 +77,11 @@ Navigate to **Storage Account → Containers → job-seeker-results → Upload**
 ```json
 {
   "keywords": ["Software Engineer", "C#", "Python", "Azure"],
-  "location": "New York, New York"
+  "location": "New York, New York",
+  "distance": 25,
+  "hoursOld": 72,
+  "jobType": "fulltime",
+  "jobTitleExclusionList": ["senior", "staff", "principal", "manager", "director"]
 }
 ```
 

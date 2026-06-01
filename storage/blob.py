@@ -29,9 +29,13 @@ def load_criteria() -> dict:
     return json.loads(blob_data)
 
 
-def save_job(job: NormalizedJob, timestamp: str) -> None:
+def save_job(job: NormalizedJob) -> bool:
+    """Upload job to blob storage. Returns False if a blob with this job id already exists."""
     sanitized_title = re.sub(r"[^a-z0-9]", "_", job.title.lower())[:50].strip("_")
-    filename = f"{job.source}_{timestamp}_{sanitized_title}.json"
+    filename = f"{job.source}_{job.id}_{sanitized_title}.json"
     container = _get_container_client()
     blob_client = container.get_blob_client(filename)
-    blob_client.upload_blob(json.dumps(dataclasses.asdict(job), indent=2), overwrite=True)
+    if blob_client.exists():
+        return False
+    blob_client.upload_blob(json.dumps(dataclasses.asdict(job), indent=2))
+    return True
