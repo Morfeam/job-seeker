@@ -1,7 +1,6 @@
 import argparse
 import logging
 import os
-from datetime import datetime, timezone
 
 from scrapers.ziprecruiter import scrape_ziprecruiter
 from scrapers.indeed import scrape_indeed
@@ -35,23 +34,26 @@ def setup_and_parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = setup_and_parse_args()
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
     log.info("Loading search criteria from Azure Blob Storage...")
     criteria = load_criteria()
     keywords: list[str] = criteria["keywords"]
     location: str = criteria["location"]
-    log.info(f"Criteria — keywords: {keywords}, location: {location}")
+    distance: int | None = criteria.get("distance")
+    hours_old: int | None = criteria.get("hoursOld")
+    title_exclusions: list[str] = [w.lower() for w in criteria.get("jobTitleExclusionList", [])]
+    log.info(f"Criteria — keywords: {keywords}, location: {location}, distance: {distance}, hoursOld: {hours_old}, titleExclusions: {title_exclusions}")
 
     raw_results: list[dict] = []
 
-    if args.scrape_ziprecruiter:
-        log.info("Scraping ZipRecruiter...")
-        raw_results.extend(scrape_ziprecruiter(keywords, location, results_wanted=10))
+    # TODO: - 'come back and fix or switch to playwright'
+    # if args.scrape_ziprecruiter:
+    #     log.info("Scraping ZipRecruiter...")
+    #     raw_results.extend(scrape_ziprecruiter(keywords, location, results_wanted=10))
 
     if args.scrape_indeed:
         log.info("Scraping Indeed...")
-        raw_results.extend(scrape_indeed(keywords, location, results_wanted=10))
+        raw_results.extend(scrape_indeed(keywords, location, distance=distance, hours_old=hours_old))
 
     if args.scrape_linkedin:
         scrape_linkedin()  # raises NotImplementedError
@@ -61,6 +63,14 @@ def main() -> None:
     normalized = [normalize_job(row) for row in raw_results]
     log.info(f"Normalized {len(normalized)} jobs")
 
+    if title_exclusions:
+        before = len(normalized)
+        normalized = [
+            job for job in normalized
+            if not any(word in job.title.lower() for word in title_exclusions)
+        ]
+        log.info(f"Title exclusion filter removed {before - len(normalized)} jobs, {len(normalized)} remaining")
+
     if args.what_if:
         log.info("[WHAT-IF] Dry run — skipping Azure writes and email")
         for job in normalized:
@@ -68,9 +78,13 @@ def main() -> None:
         return
 
     log.info("Saving jobs to Azure Blob Storage...")
+    saved, skipped = 0, 0
     for job in normalized:
-        save_job(job, timestamp)
-    log.info(f"Saved {len(normalized)} job files to blob storage")
+        if save_job(job):
+            saved += 1
+        else:
+            skipped += 1
+    log.info(f"Saved {saved} new jobs, skipped {skipped} duplicates")
 
     if args.email:
         log.info(f"Sending results email to {args.email}...")
