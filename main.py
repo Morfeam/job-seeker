@@ -2,11 +2,17 @@ import argparse
 import logging
 import os
 
+import anthropic
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from scrapers.ziprecruiter import scrape_ziprecruiter
 from scrapers.indeed import scrape_indeed
 from scrapers.linkedin import scrape_linkedin
 from processing.normalize import normalize_job
-from storage.blob import load_criteria, save_job
+from processing.enrich import enrich_job
+from storage.blob import load_criteria, save_job, job_exists
 from notifications.email import send_results_email
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -21,14 +27,16 @@ def setup_and_parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Job Seeker Scraper")
     parser.add_argument("--scrape-ziprecruiter", type=_bool_arg, default=True,
                         metavar="BOOL", help="Scrape ZipRecruiter (default: true)")
-    parser.add_argument("--scrape-indeed", type=_bool_arg, default=True,
-                        metavar="BOOL", help="Scrape Indeed (default: true)")
+    parser.add_argument("--scrape-indeed", type=_bool_arg, default=False,
+                        metavar="BOOL", help="Scrape Indeed (default: false)")
     parser.add_argument("--scrape-linkedin", type=_bool_arg, default=False,
                         metavar="BOOL", help="Scrape LinkedIn (default: false, not implemented)")
     parser.add_argument("--what-if", type=_bool_arg, default=False,
                         metavar="BOOL", help="Dry run — skip Azure writes and email (default: false)")
     parser.add_argument("--email", type=str, default=os.environ.get('RECIPIENT_EMAIL', ''),
                         help="Recipient email address for results notification")
+    parser.add_argument("--enrich", type=_bool_arg, default=False,
+                        metavar="BOOL", help="Use Claude to enrich job descriptions (default: false)")
     return parser.parse_args()
 
 
@@ -45,6 +53,7 @@ def main() -> None:
     log.info(f"Criteria — keywords: {keywords}, location: {location}, distance: {distance}, hoursOld: {hours_old}, titleExclusions: {title_exclusions}")
 
     raw_results: list[dict] = []
+    scrape_counts: dict[str, int] = {}
 
     # TODO: - 'come back and fix or switch to playwright'
     # if args.scrape_ziprecruiter:
@@ -53,12 +62,18 @@ def main() -> None:
 
     if args.scrape_indeed:
         log.info("Scraping Indeed...")
-        raw_results.extend(scrape_indeed(keywords, location, distance=distance, hours_old=hours_old))
+        indeed_results = scrape_indeed(keywords, location, distance=distance, hours_old=hours_old)
+        scrape_counts["indeed"] = len(indeed_results)
+        raw_results.extend(indeed_results)
 
     if args.scrape_linkedin:
-        scrape_linkedin()  # raises NotImplementedError
+        log.info("Scraping LinkedIn...")
+        linkedin_results = scrape_linkedin(keywords, location, distance=distance, hours_old=hours_old)
+        scrape_counts["linkedin"] = len(linkedin_results)
+        raw_results.extend(linkedin_results)
 
-    log.info(f"Total raw results: {len(raw_results)}")
+    counts_str = ", ".join(f"{src}: {n}" for src, n in scrape_counts.items())
+    log.info(f"Scrape totals — {counts_str} | combined: {len(raw_results)}")
 
     normalized = [normalize_job(row) for row in raw_results]
     log.info(f"Normalized {len(normalized)} jobs")
@@ -70,6 +85,16 @@ def main() -> None:
             if not any(word in job.title.lower() for word in title_exclusions)
         ]
         log.info(f"Title exclusion filter removed {before - len(normalized)} jobs, {len(normalized)} remaining")
+
+    before = len(normalized)
+    normalized = [job for job in normalized if not job_exists(job)]
+    log.info(f"Dedup: {before - len(normalized)} already in Azure, {len(normalized)} new jobs to process")
+
+    if args.enrich:
+        log.info("Enriching job descriptions via Claude...")
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        normalized = [enrich_job(job, client) for job in normalized]
+        log.info("Enrichment complete")
 
     if args.what_if:
         log.info("[WHAT-IF] Dry run — skipping Azure writes and email")

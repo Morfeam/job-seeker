@@ -4,6 +4,12 @@ import math
 
 
 @dataclass
+class Technology:
+    name: str
+    years_experience: int | None
+
+
+@dataclass
 class NormalizedJob:
     id: str | None
     source: str
@@ -18,6 +24,10 @@ class NormalizedJob:
     company_url: str | None
     company_industry: str | None
     years_experience: int | None
+    technologies: list[Technology] | None
+    hard_requirements: list[str] | None
+    soft_requirements: list[str] | None
+    ai_summary: str | None
 
 
 def _is_nan(value) -> bool:
@@ -96,4 +106,8 @@ def normalize_job(row: dict) -> NormalizedJob:
         company_url=_str_or_none(row.get("company_url")),
         company_industry=_str_or_none(row.get("company_industry")),
         years_experience=None,
+        technologies=None,
+        hard_requirements=None,
+        soft_requirements=None,
+        ai_summary=None,
     )
