@@ -2,6 +2,10 @@ import dataclasses
 import json
 import os
 import re
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+_EST = ZoneInfo("America/New_York")
 
 from azure.storage.blob import BlobServiceClient, ContainerClient
 
@@ -45,5 +49,9 @@ def save_job(job: NormalizedJob) -> bool:
     blob_client = container.get_blob_client(_blob_filename(job))
     if blob_client.exists():
         return False
-    blob_client.upload_blob(json.dumps(dataclasses.asdict(job), indent=2))
+    now_utc = datetime.now(timezone.utc)
+    now_est = now_utc.astimezone(_EST)
+    last_updated_est = f"{now_est.month}/{now_est.day}/{now_est.year} - {int(now_est.strftime('%I'))}:{now_est.strftime('%M%p')}"
+    stamped = dataclasses.replace(job, created_dt=now_utc.isoformat(), last_updated_dt=now_utc.isoformat(), formatted_updated_dt=last_updated_est)
+    blob_client.upload_blob(json.dumps(dataclasses.asdict(stamped), indent=2))
     return True

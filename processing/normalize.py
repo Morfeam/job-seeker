@@ -7,6 +7,8 @@ import math
 class Technology:
     name: str
     years_experience: int | None
+    preferred_years_experience: int | None = None
+    is_preferred: bool = False
 
 
 @dataclass
@@ -21,13 +23,18 @@ class NormalizedJob:
     job_type: str | None
     date_posted: str | None
     description: str | None
+    job_url: str | None
     company_url: str | None
     company_industry: str | None
     years_experience: int | None
     technologies: list[Technology] | None
     hard_requirements: list[str] | None
+    preferred_requirements: list[str] | None
     soft_requirements: list[str] | None
     ai_summary: str | None
+    created_dt: str | None
+    last_updated_dt: str | None
+    formatted_updated_dt: str | None
 
 
 def _is_nan(value) -> bool:
@@ -103,11 +110,16 @@ def normalize_job(row: dict) -> NormalizedJob:
         job_type=job_type,
         date_posted=date_posted,
         description=_str_or_none(row.get("description")),
+        job_url=_str_or_none(row.get("job_url")),
         company_url=_str_or_none(row.get("company_url")),
         company_industry=_str_or_none(row.get("company_industry")),
         years_experience=None,
         technologies=None,
         hard_requirements=None,
+        preferred_requirements=None,
         soft_requirements=None,
         ai_summary=None,
+        created_dt=None,
+        last_updated_dt=None,
+        formatted_updated_dt=None,
     )

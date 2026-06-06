@@ -15,8 +15,13 @@ from processing.enrich import enrich_job
 from storage.blob import load_criteria, save_job, job_exists
 from notifications.email import send_results_email
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
+
+_LOG_LEVELS = {
+    "debug": logging.INFO,
+    "standard": logging.WARNING,
+    "none": logging.CRITICAL + 1,
+}
 
 
 def _bool_arg(value: str) -> bool:
@@ -37,11 +42,27 @@ def setup_and_parse_args() -> argparse.Namespace:
                         help="Recipient email address for results notification")
     parser.add_argument("--enrich", type=_bool_arg, default=False,
                         metavar="BOOL", help="Use Claude to enrich job descriptions (default: false)")
+    parser.add_argument("--log-level", type=str, default="standard", choices=["debug", "standard", "none"],
+                        help="Logging verbosity: debug=info+, standard=warning+ only, none=silent (default: standard)")
     return parser.parse_args()
+
+
+def _print_summary(scrape_counts: dict[str, int], title_excluded: int, duplicates_skipped: int, saved: int, what_if: bool = False) -> None:
+    print("\n" + "=" * 40)
+    print("  JOB SEEKER RUN SUMMARY" + (" [WHAT-IF]" if what_if else ""))
+    print("=" * 40)
+    for src, count in scrape_counts.items():
+        print(f"  {src.capitalize():<12} {count} jobs found")
+    print(f"  {'Total':<12} {sum(scrape_counts.values())} jobs scraped")
+    print(f"  {'Excluded':<12} {title_excluded} removed by title filter")
+    print(f"  {'Duplicates':<12} {duplicates_skipped} already in Azure")
+    print(f"  {'Saved':<12} {saved} new jobs {'(dry run)' if what_if else 'uploaded to Azure'}")
+    print("=" * 40 + "\n")
 
 
 def main() -> None:
     args = setup_and_parse_args()
+    logging.basicConfig(level=_LOG_LEVELS[args.log_level], format="%(levelname)s: %(message)s")
 
     log.info("Loading search criteria from Azure Blob Storage...")
     criteria = load_criteria()
@@ -78,17 +99,20 @@ def main() -> None:
     normalized = [normalize_job(row) for row in raw_results]
     log.info(f"Normalized {len(normalized)} jobs")
 
+    title_excluded = 0
     if title_exclusions:
         before = len(normalized)
         normalized = [
             job for job in normalized
             if not any(word in job.title.lower() for word in title_exclusions)
         ]
-        log.info(f"Title exclusion filter removed {before - len(normalized)} jobs, {len(normalized)} remaining")
+        title_excluded = before - len(normalized)
+        log.info(f"Title exclusion filter removed {title_excluded} jobs, {len(normalized)} remaining")
 
     before = len(normalized)
     normalized = [job for job in normalized if not job_exists(job)]
-    log.info(f"Dedup: {before - len(normalized)} already in Azure, {len(normalized)} new jobs to process")
+    duplicates_skipped = before - len(normalized)
+    log.info(f"Dedup: {duplicates_skipped} already in Azure, {len(normalized)} new jobs to process")
 
     if args.enrich:
         log.info("Enriching job descriptions via Claude...")
@@ -100,6 +124,7 @@ def main() -> None:
         log.info("[WHAT-IF] Dry run — skipping Azure writes and email")
         for job in normalized:
             log.info(f"  [{job.source}] {job.title} @ {job.company} | {job.location} | {job.salary}")
+        _print_summary(scrape_counts, title_excluded, duplicates_skipped, saved=0, what_if=True)
         return
 
     log.info("Saving jobs to Azure Blob Storage...")
@@ -116,6 +141,8 @@ def main() -> None:
         send_results_email(normalized, args.email)
     else:
         log.info("No --email provided — skipping email")
+
+    _print_summary(scrape_counts, title_excluded, duplicates_skipped, saved=saved)
 
 
 if __name__ == "__main__":

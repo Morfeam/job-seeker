@@ -14,17 +14,26 @@ _MODEL = "claude-haiku-4-5-20251001"
 _SYSTEM = (
     "You are a job posting analyst. Given a job description, extract structured information "
     "and return it as JSON with exactly these keys:\n\n"
+    "IMPORTANT: If the language is ambiguous or unclear about whether something is required or preferred, "
+    "treat it as a hard requirement. Only mark something as preferred when the posting explicitly uses "
+    'language like "nice to have", "preferred", "a plus", "ideally", or "not required".\n\n'
     '- "technologies": list of objects, each with:\n'
     '    - "name": string — the tool, language, framework, or platform\n'
-    '    - "years_experience": integer or null — years explicitly required for this specific technology '
-    '(e.g. "4+ years working with SQL" → 4; if no years mentioned for this technology → null)\n'
-    '- "hard_requirements": list of strings — concrete must-have requirements (overall years of experience, '
-    "degrees, certifications, security clearances)\n"
+    '    - "is_preferred": boolean — true ONLY when explicitly marked as optional/nice-to-have; default false\n'
+    '    - "years_experience": integer or null — years explicitly required for this technology '
+    '(e.g. "must have 4+ years with SQL" -> 4; null if not mentioned or not required)\n'
+    '    - "preferred_years_experience": integer or null — years mentioned as preferred but not mandatory '
+    '(e.g. "ideally 5+ years with React" -> 5; null if not mentioned)\n'
+    '- "hard_requirements": list of strings — must-have requirements (years of experience, degrees, '
+    "certifications, clearances). When in doubt, list here rather than preferred_requirements.\n"
+    '- "preferred_requirements": list of strings — qualifications EXPLICITLY framed as optional. '
+    "Leave empty if nothing clearly qualifies.\n"
     '- "soft_requirements": list of strings — workplace or lifestyle requirements (relocation, travel '
     "frequency, on-site days per week, work authorization)\n"
     '- "summary": string — 2-3 sentence plain-English summary of the role\n\n'
     "Example technologies entry: "
-    '[{"name": "SQL", "years_experience": 4}, {"name": "Azure", "years_experience": null}]\n\n'
+    '[{"name": "SQL", "is_preferred": false, "years_experience": 4, "preferred_years_experience": null}, '
+    '{"name": "Kubernetes", "is_preferred": true, "years_experience": null, "preferred_years_experience": 2}]\n\n'
     "Return only valid JSON. No markdown fences, no explanation."
 )
 
@@ -44,7 +53,7 @@ def enrich_job(job: NormalizedJob, client: anthropic.Anthropic) -> NormalizedJob
     try:
         response = client.messages.create(
             model=_MODEL,
-            max_tokens=1024,
+            max_tokens=2048,
             system=_SYSTEM,
             messages=[{"role": "user", "content": f"Job description:\n\n{job.description}"}],
         )
@@ -54,6 +63,8 @@ def enrich_job(job: NormalizedJob, client: anthropic.Anthropic) -> NormalizedJob
             Technology(
                 name=t.get("name", ""),
                 years_experience=t.get("years_experience"),
+                preferred_years_experience=t.get("preferred_years_experience"),
+                is_preferred=t.get("is_preferred", False),
             )
             for t in (data.get("technologies") or [])
             if t.get("name")
@@ -63,6 +74,7 @@ def enrich_job(job: NormalizedJob, client: anthropic.Anthropic) -> NormalizedJob
             job,
             technologies=technologies,
             hard_requirements=data.get("hard_requirements") or [],
+            preferred_requirements=data.get("preferred_requirements") or [],
             soft_requirements=data.get("soft_requirements") or [],
             ai_summary=data.get("summary"),
         )
