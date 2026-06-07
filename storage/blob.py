@@ -2,6 +2,10 @@ import dataclasses
 import json
 import os
 import re
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+_EST = ZoneInfo("America/New_York")
 
 from azure.storage.blob import BlobServiceClient, ContainerClient
 
@@ -29,13 +33,25 @@ def load_criteria() -> dict:
     return json.loads(blob_data)
 
 
+def _blob_filename(job: NormalizedJob) -> str:
+    sanitized_title = re.sub(r"[^a-z0-9]", "_", job.title.lower())[:50].strip("_")
+    return f"{job.source}_{job.id}_{sanitized_title}.json"
+
+
+def job_exists(job: NormalizedJob) -> bool:
+    """Returns True if a blob for this job id already exists in storage."""
+    return _get_container_client().get_blob_client(_blob_filename(job)).exists()
+
+
 def save_job(job: NormalizedJob) -> bool:
     """Upload job to blob storage. Returns False if a blob with this job id already exists."""
-    sanitized_title = re.sub(r"[^a-z0-9]", "_", job.title.lower())[:50].strip("_")
-    filename = f"{job.source}_{job.id}_{sanitized_title}.json"
     container = _get_container_client()
-    blob_client = container.get_blob_client(filename)
+    blob_client = container.get_blob_client(_blob_filename(job))
     if blob_client.exists():
         return False
-    blob_client.upload_blob(json.dumps(dataclasses.asdict(job), indent=2))
+    now_utc = datetime.now(timezone.utc)
+    now_est = now_utc.astimezone(_EST)
+    last_updated_est = f"{now_est.month}/{now_est.day}/{now_est.year} - {int(now_est.strftime('%I'))}:{now_est.strftime('%M%p')}"
+    stamped = dataclasses.replace(job, created_dt=now_utc.isoformat(), last_updated_dt=now_utc.isoformat(), formatted_updated_dt=last_updated_est)
+    blob_client.upload_blob(json.dumps(dataclasses.asdict(stamped), indent=2))
     return True
