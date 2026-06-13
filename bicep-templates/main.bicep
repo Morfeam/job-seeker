@@ -75,11 +75,55 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2025-01-01'
   name: 'default'
 }
 
-resource jobSeekerContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
+resource jobSearchResultsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
   parent: blobService
   name: 'job-seeker-results'
   properties: {
     publicAccess: 'None'
+  }
+}
+
+resource resumeContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
+  parent: blobService
+  name: 'resume'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
+resource coverLetterContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
+  parent: blobService
+  name: 'cover-letter'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
+resource criteriaContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
+  parent: blobService
+  name: 'criteria'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
+resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2025-01-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+resource jobLinksTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'JobLinks'
+}
+
+module webAppDeploy './webapp.bicep' = {
+  name: 'webAppDeploy'
+  params: {
+    location: location
+    environment: environment
+    userAssignedIdentityId: managedIdentity.id
+    userAssignedIdentityClientId: managedIdentity.properties.clientId
   }
 }
 
@@ -98,3 +142,5 @@ output containerAppEnvironmentId string = containerEnvDeploy.outputs.containerAp
 output managedIdentityId string = managedIdentity.id
 output managedIdentityClientId string = managedIdentity.properties.clientId
 output keyVaultUri string = keyVault.properties.vaultUri
+output apiUrl string = webAppDeploy.outputs.apiUrl
+output appServiceName string = webAppDeploy.outputs.appServiceName
