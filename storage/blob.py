@@ -11,8 +11,8 @@ from azure.storage.blob import BlobServiceClient, ContainerClient
 
 from processing.normalize import NormalizedJob
 
-CONTAINER_NAME = "job-seeker-results"
-CRITERIA_BLOB_NAME = "criteria.json"
+JOB_RESULTS_CONTAINER = "job-seeker-results"
+CRITERIA_CONTAINER = "criteria"
 
 _AZURE_CONNECTION_STRING = ""  # placeholder — set AZURE_STORAGE_CONNECTION_STRING env var
 
@@ -21,37 +21,35 @@ def _get_connection_string() -> str:
     return os.environ.get("AZURE_STORAGE_CONNECTION_STRING") or _AZURE_CONNECTION_STRING
 
 
-def _get_container_client() -> ContainerClient:
-    conn_str = _get_connection_string()
-    client = BlobServiceClient.from_connection_string(conn_str)
-    return client.get_container_client(CONTAINER_NAME)
+def _get_blob_service_client() -> BlobServiceClient:
+    return BlobServiceClient.from_connection_string(_get_connection_string())
 
 
-def load_criteria() -> dict:
-    container = _get_container_client()
-    blob_data = container.get_blob_client(CRITERIA_BLOB_NAME).download_blob().readall()
-    return json.loads(blob_data)
+def load_criteria(customer_id: str) -> dict:
+    blob_name = f"{customer_id}/criteria.json"
+    client = _get_blob_service_client().get_blob_client(container=CRITERIA_CONTAINER, blob=blob_name)
+    return json.loads(client.download_blob().readall())
 
 
-def _blob_filename(job: NormalizedJob) -> str:
+def blob_name(job: NormalizedJob, customer_id: str) -> str:
     sanitized_title = re.sub(r"[^a-z0-9]", "_", job.title.lower())[:50].strip("_")
-    return f"{job.source}_{job.id}_{sanitized_title}.json"
+    return f"{customer_id}/{job.source}_{job.id}_{sanitized_title}.json"
 
 
-def job_exists(job: NormalizedJob) -> bool:
-    """Returns True if a blob for this job id already exists in storage."""
-    return _get_container_client().get_blob_client(_blob_filename(job)).exists()
+def job_exists(job: NormalizedJob, customer_id: str) -> bool:
+    """Returns True if a blob for this job already exists under the customer's folder."""
+    client = _get_blob_service_client().get_blob_client(container=JOB_RESULTS_CONTAINER, blob=blob_name(job, customer_id))
+    return client.exists()
 
 
-def save_job(job: NormalizedJob) -> bool:
-    """Upload job to blob storage. Returns False if a blob with this job id already exists."""
-    container = _get_container_client()
-    blob_client = container.get_blob_client(_blob_filename(job))
-    if blob_client.exists():
+def save_job(job: NormalizedJob, customer_id: str) -> bool:
+    """Upload job to blob storage under the customer's folder. Returns False if already exists."""
+    client = _get_blob_service_client().get_blob_client(container=JOB_RESULTS_CONTAINER, blob=blob_name(job, customer_id))
+    if client.exists():
         return False
     now_utc = datetime.now(timezone.utc)
     now_est = now_utc.astimezone(_EST)
-    last_updated_est = f"{now_est.month}/{now_est.day}/{now_est.year} - {int(now_est.strftime('%I'))}:{now_est.strftime('%M%p')}"
-    stamped = dataclasses.replace(job, created_dt=now_utc.isoformat(), last_updated_dt=now_utc.isoformat(), formatted_updated_dt=last_updated_est)
-    blob_client.upload_blob(json.dumps(dataclasses.asdict(stamped), indent=2))
+    formatted = f"{now_est.month}/{now_est.day}/{now_est.year} - {int(now_est.strftime('%I'))}:{now_est.strftime('%M%p')}"
+    stamped = dataclasses.replace(job, created_dt=now_utc.isoformat(), last_updated_dt=now_utc.isoformat(), formatted_updated_dt=formatted)
+    client.upload_blob(json.dumps(dataclasses.asdict(stamped), indent=2))
     return True

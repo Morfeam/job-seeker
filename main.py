@@ -12,7 +12,8 @@ from scrapers.indeed import scrape_indeed
 from scrapers.linkedin import scrape_linkedin
 from processing.normalize import normalize_job
 from processing.enrich import enrich_job
-from storage.blob import load_criteria, save_job, job_exists
+from storage.blob import load_criteria, save_job, job_exists, blob_name
+from storage.table import upsert_job
 from notifications.email import send_results_email
 
 log = logging.getLogger(__name__)
@@ -44,6 +45,8 @@ def setup_and_parse_args() -> argparse.Namespace:
                         metavar="BOOL", help="Use Claude to enrich job descriptions (default: false)")
     parser.add_argument("--log-level", type=str, default="standard", choices=["debug", "standard", "none"],
                         help="Logging verbosity: debug=info+, standard=warning+ only, none=silent (default: standard)")
+    parser.add_argument("--customer-id", type=str, default="00000000-0000-0000-0000-000000000000",
+                        help="Customer/persona ID — determines criteria file and blob folder (default: empty guid)")
     return parser.parse_args()
 
 
@@ -64,8 +67,11 @@ def main() -> None:
     args = setup_and_parse_args()
     logging.basicConfig(level=_LOG_LEVELS[args.log_level], format="%(levelname)s: %(message)s")
 
+    customer_id = args.customer_id
+    log.info(f"Customer ID: {customer_id}")
+
     log.info("Loading search criteria from Azure Blob Storage...")
-    criteria = load_criteria()
+    criteria = load_criteria(customer_id)
     keywords: list[str] = criteria["keywords"]
     location: str = criteria["location"]
     distance: int | None = criteria.get("distance")
@@ -110,7 +116,7 @@ def main() -> None:
         log.info(f"Title exclusion filter removed {title_excluded} jobs, {len(normalized)} remaining")
 
     before = len(normalized)
-    normalized = [job for job in normalized if not job_exists(job)]
+    normalized = [job for job in normalized if not job_exists(job, customer_id)]
     duplicates_skipped = before - len(normalized)
     log.info(f"Dedup: {duplicates_skipped} already in Azure, {len(normalized)} new jobs to process")
 
@@ -130,7 +136,8 @@ def main() -> None:
     log.info("Saving jobs to Azure Blob Storage...")
     saved, skipped = 0, 0
     for job in normalized:
-        if save_job(job):
+        if save_job(job, customer_id):
+            upsert_job(job.id, blob_name(job, customer_id), customer_id)
             saved += 1
         else:
             skipped += 1
