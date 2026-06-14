@@ -1,0 +1,48 @@
+<!-- Hero -->
+<section class="py-5 bg-primary text-white text-center">
+  <div class="container py-4">
+    <h1 class="display-4 fw-bold mb-3">Matt's Job Seeker</h1>
+    <p class="lead mb-4">A smarter way to job search</p>
+    @if (isLoggedIn | async) {
+      <a routerLink="/dashboard" class="btn btn-light btn-lg fw-semibold me-2">Go to Dashboard</a>
+    } @else {
+      <a routerLink="/sign-up" class="btn btn-light btn-lg fw-semibold me-2">Get Started</a>
+      <a routerLink="/sign-in" class="btn btn-outline-light btn-lg">Sign In</a>
+    }
+  </div>
+</section>
+
+<!-- Feature cards -->
+<section class="py-5">
+  <div class="container">
+    <div class="row g-4 justify-content-center">
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm text-center p-4">
+          <div class="mb-3">
+            <i class="bi bi-search fs-1 text-primary"></i>
+          </div>
+          <h5 class="card-title fw-bold">Automated Scraping</h5>
+          <p class="card-text text-muted">Searches Indeed and LinkedIn daily so you never miss a new listing.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm text-center p-4">
+          <div class="mb-3">
+            <i class="bi bi-cpu fs-1 text-primary"></i>
+          </div>
+          <h5 class="card-title fw-bold">AI-Powered Insights</h5>
+          <p class="card-text text-muted">Claude extracts required skills, technologies, and key requirements from every job description.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm text-center p-4">
+          <div class="mb-3">
+            <i class="bi bi-person-check fs-1 text-primary"></i>
+          </div>
+          <h5 class="card-title fw-bold">Personalized Results</h5>
+          <p class="card-text text-muted">Your own criteria, your own results — tailored to exactly what you're looking for.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

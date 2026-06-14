@@ -1,0 +1,49 @@
+<div class="container py-5 d-flex justify-content-center">
+  <div class="card border-0 shadow-sm p-4" style="width: 100%; max-width: 440px;">
+    <h2 class="fw-bold mb-1">Sign in</h2>
+    <p class="text-muted mb-4 small">Welcome back to Matt's Job Seeker.</p>
+
+    @if (errorMessage) {
+      <div class="alert alert-danger py-2 small">{{ errorMessage }}</div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Email</label>
+        <input type="email" class="form-control" formControlName="email" placeholder="you@example.com"
+          [class.is-invalid]="form.get('email')?.invalid && form.get('email')?.touched">
+        @if (form.get('email')?.hasError('required') && form.get('email')?.touched) {
+          <div class="invalid-feedback">Email is required.</div>
+        } @else if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+          <div class="invalid-feedback">Enter a valid email address.</div>
+        }
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Password</label>
+        <input type="password" class="form-control" formControlName="password" placeholder="••••••••"
+          [class.is-invalid]="form.get('password')?.invalid && form.get('password')?.touched">
+        @if (form.get('password')?.hasError('required') && form.get('password')?.touched) {
+          <div class="invalid-feedback">Password is required.</div>
+        }
+      </div>
+
+      <div class="mb-4 form-check">
+        <input type="checkbox" class="form-check-input" id="rememberMe" formControlName="rememberMe">
+        <label class="form-check-label" for="rememberMe">Remember me</label>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" [disabled]="loading">
+        {{ loading ? 'Signing in…' : 'Sign In' }}
+      </button>
+    </form>
+
+    <p class="text-center mt-3 small text-muted">
+      <a routerLink="/forgot-password">Forgot your password?</a>
+    </p>
+    <hr>
+    <p class="text-center small text-muted mb-0">
+      Don't have an account? <a routerLink="/sign-up">Sign up</a>
+    </p>
+  </div>
+</div>

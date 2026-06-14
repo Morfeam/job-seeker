@@ -13,6 +13,12 @@ param userAssignedIdentityClientId string
 @description('App Service Plan SKU')
 param sku string = 'B1'
 
+@description('Azure Table Storage service endpoint URL')
+param tableServiceEndpoint string
+
+@description('Key Vault URI for loading secrets at runtime')
+param keyVaultUri string
+
 var appInsightsName = 'job-seeker-ai-${environment}'
 var planName = 'job-seeker-plan-${environment}'
 var appServiceName = 'job-seeker-api-${environment}'
@@ -55,7 +61,7 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
     serverFarmId: appServicePlan.id
     httpsOnly: true
     siteConfig: {
-      linuxFxVersion: 'PYTHON|3.11'
+      linuxFxVersion: 'DOTNETCORE|10.0'
       appSettings: [
         {
           name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
@@ -72,6 +78,14 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
           value: '1'
+        }
+        {
+          name: 'AZURE_TABLE_SERVICE_ENDPOINT'
+          value: tableServiceEndpoint
+        }
+        {
+          name: 'KEY_VAULT_URI'
+          value: keyVaultUri
         }
       ]
     }

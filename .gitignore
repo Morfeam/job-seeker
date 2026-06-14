@@ -10,6 +10,12 @@
 *.user
 *.suo
 
+# .NET build output
+job-seeker.Server/obj/
+job-seeker.Server/bin/
+job-seeker.client/obj/
+job-seeker.client/.vscode/
+
 # Python
 __pycache__/
 *.py[cod]
@@ -29,8 +35,6 @@ build/
 venv/
 env/
 
-# Docker
-*.dockerignore
 
 # Logs
 *.log

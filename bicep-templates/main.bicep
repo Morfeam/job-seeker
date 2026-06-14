@@ -117,6 +117,11 @@ resource jobLinksTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2
   name: 'JobLinks'
 }
 
+resource customersTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'Customers'
+}
+
 module webAppDeploy './webapp.bicep' = {
   name: 'webAppDeploy'
   params: {
@@ -124,6 +129,8 @@ module webAppDeploy './webapp.bicep' = {
     environment: environment
     userAssignedIdentityId: managedIdentity.id
     userAssignedIdentityClientId: managedIdentity.properties.clientId
+    tableServiceEndpoint: storageAccount.properties.primaryEndpoints.table
+    keyVaultUri: keyVault.properties.vaultUri
   }
 }
 
