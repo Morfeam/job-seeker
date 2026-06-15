@@ -8,7 +8,6 @@ namespace job_seeker.Server.Authorization;
 public class TokenHandler
 {
     private readonly IConfiguration _config;
-    private const int PasswordResetExpiryMinutes = 15;
     private const string PasswordResetPurpose = "password-reset";
 
     public TokenHandler(IConfiguration config)
@@ -27,9 +26,10 @@ public class TokenHandler
 
     public string CreatePasswordResetToken(string customerId)
     {
+        var expiryMinutes = int.Parse(_config["jwt-password-expiration-in-minutes"] ?? "15");
         return GenerateToken(
             subject: customerId,
-            expiry: DateTime.UtcNow.AddMinutes(PasswordResetExpiryMinutes),
+            expiry: DateTime.UtcNow.AddMinutes(expiryMinutes),
             extraClaims: new Dictionary<string, object> { ["purpose"] = PasswordResetPurpose });
     }
 

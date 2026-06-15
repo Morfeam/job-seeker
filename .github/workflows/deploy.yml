@@ -123,10 +123,10 @@ jobs:
         run: mkdir -p job-seeker.client/obj/Debug
 
       - name: dotnet restore
-        run: dotnet restore job-seeker.sln
+        run: dotnet restore job-seeker.slnx
 
       - name: dotnet build
-        run: dotnet build job-seeker.sln --no-restore --configuration Release
+        run: dotnet build job-seeker.slnx --no-restore --configuration Release
 
       - name: dotnet publish
         run: dotnet publish job-seeker.Server/job-seeker.Server.csproj --configuration Release --no-build --output ./webapp-publish
