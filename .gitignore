@@ -10,6 +10,9 @@
 *.user
 *.suo
 
+# Local dev overrides (contain secrets)
+job-seeker.Server/local.settings.json
+
 # .NET build output
 job-seeker.Server/obj/
 job-seeker.Server/bin/

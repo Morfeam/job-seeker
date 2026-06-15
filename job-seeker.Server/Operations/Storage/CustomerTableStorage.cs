@@ -18,15 +18,11 @@ public class CustomerTableStorage : ICustomerStorage
 
     public async Task<SecureCustomer?> GetByEmailAsync(string email)
     {
-        try
-        {
-            var entity = await GetTable().GetEntityAsync<TableEntity>(email.ToLowerInvariant(), email.ToLowerInvariant());
-            return MapToCustomer(entity.Value);
-        }
-        catch (RequestFailedException ex) when (ex.Status == 404)
-        {
-            return null;
-        }
+        var pages = GetTable().QueryAsync<TableEntity>(
+            filter: $"PartitionKey eq '{email.ToLowerInvariant()}'");
+        await foreach (var entity in pages)
+            return MapToCustomer(entity);
+        return null;
     }
 
     public async Task<SecureCustomer?> GetByIdAsync(string id)

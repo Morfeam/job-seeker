@@ -15,7 +15,7 @@ builder.Services.AddSwaggerGen();
 var credential = new DefaultAzureCredential();
 
 // KEY_VAULT_URI is a non-secret app setting injected by webapp.bicep
-var keyVaultUri = builder.Configuration["KEY_VAULT_URI"];
+var keyVaultUri = builder.Configuration["KEY_VAULT_URI"] ?? "https://job-seeker-kv-dev.vault.azure.net/";
 if (!string.IsNullOrEmpty(keyVaultUri))
 {
     builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), credential);
@@ -29,6 +29,10 @@ builder.Services.AddAzureClients(b =>
     {
         b.AddTableServiceClient(new Uri(tableEndpoint));
         b.UseCredential(credential);
+    }
+    else
+    {
+        b.AddTableServiceClient(builder.Configuration["storage-connection-string"]);
     }
 });
 
@@ -59,7 +63,9 @@ builder.Services.AddSingleton<TokenHandler>();
 builder.Services.AddSingleton<ICustomerStorage, CustomerTableStorage>();
 builder.Services.AddScoped<ISendEmail, SendEmail>();
 
-builder.Services.AddApplicationInsightsTelemetry();
+// APPLICATIONINSIGHTS_CONNECTION_STRING is an App Service app setting — not available locally
+if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+    builder.Services.AddApplicationInsightsTelemetry();
 
 var app = builder.Build();
 
