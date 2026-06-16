@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="job-seeker.client/job-seeker.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="job-seeker.Server/job-seeker.Server.csproj" />
+</Solution>

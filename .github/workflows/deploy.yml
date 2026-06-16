@@ -71,8 +71,8 @@ jobs:
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./job-seeker-scraper
+          file: ./job-seeker-scraper/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
 
@@ -100,3 +100,46 @@ jobs:
             --name "job-seeker-job-dev" \
             --resource-group ${{ vars.AZURE_RESOURCE_GROUP }} \
             --cron-expression "0 0 30 2 *"
+
+  build-and-deploy-webapp:
+    runs-on: ubuntu-latest
+    needs: deploy-infra
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: npm install (Angular client)
+        run: cd job-seeker.client && npm ci
+
+      - name: Create obj/Debug directory (SpaProxy workaround)
+        run: mkdir -p job-seeker.client/obj/Debug
+
+      - name: dotnet restore
+        run: dotnet restore job-seeker.slnx
+
+      - name: dotnet build
+        run: dotnet build job-seeker.slnx --no-restore --configuration Release
+
+      - name: dotnet publish
+        run: dotnet publish job-seeker.Server/job-seeker.Server.csproj --configuration Release --no-build --output ./webapp-publish
+
+      - name: Create deployment zip
+        run: cd webapp-publish && zip -r ../job-seeker-webapp.zip .
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'job-seeker-api-dev'
+          package: job-seeker-webapp.zip

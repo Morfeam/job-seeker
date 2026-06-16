@@ -1,0 +1,47 @@
+@if (loading) {
+  <div class="container py-5 text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading…</span>
+    </div>
+  </div>
+} @else if (customer) {
+  <!-- Hero -->
+  <section class="py-5 bg-light border-bottom">
+    <div class="container">
+      <h1 class="fw-bold mb-1">Welcome, {{ customer.firstName }}!</h1>
+      <p class="text-muted">Here's your job search dashboard.</p>
+    </div>
+  </section>
+
+  <!-- Placeholder cards -->
+  <section class="py-5">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm text-center p-4">
+            <i class="bi bi-briefcase fs-1 text-primary mb-3"></i>
+            <h5 class="fw-bold">My Jobs</h5>
+            <p class="text-muted small">View and manage jobs found for your profile.</p>
+            <span class="badge bg-secondary">Coming soon</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm text-center p-4">
+            <i class="bi bi-sliders fs-1 text-primary mb-3"></i>
+            <h5 class="fw-bold">Search Criteria</h5>
+            <p class="text-muted small">Configure keywords, location, and filters.</p>
+            <span class="badge bg-secondary">Coming soon</span>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm text-center p-4">
+            <i class="bi bi-file-earmark-person fs-1 text-primary mb-3"></i>
+            <h5 class="fw-bold">My Resume</h5>
+            <p class="text-muted small">Upload your resume to match against job listings.</p>
+            <span class="badge bg-secondary">Coming soon</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+}

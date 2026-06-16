@@ -117,6 +117,23 @@ resource jobLinksTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2
   name: 'JobLinks'
 }
 
+resource customersTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'Customers'
+}
+
+// Storage Table Data Contributor — allows the managed identity to read/write table rows
+var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+resource tableRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, managedIdentity.id, storageTableDataContributorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 module webAppDeploy './webapp.bicep' = {
   name: 'webAppDeploy'
   params: {
@@ -124,6 +141,8 @@ module webAppDeploy './webapp.bicep' = {
     environment: environment
     userAssignedIdentityId: managedIdentity.id
     userAssignedIdentityClientId: managedIdentity.properties.clientId
+    tableServiceEndpoint: storageAccount.properties.primaryEndpoints.table
+    keyVaultUri: keyVault.properties.vaultUri
   }
 }
 

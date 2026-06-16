@@ -1,0 +1,75 @@
+<div class="container py-5 d-flex justify-content-center">
+  <div class="card border-0 shadow-sm p-4" style="width: 100%; max-width: 480px;">
+    <h2 class="fw-bold mb-1">Create account</h2>
+    <p class="text-muted mb-4 small">Get started with Matt's Job Seeker.</p>
+
+    @if (errorMessage) {
+      <div class="alert alert-danger py-2 small">{{ errorMessage }}</div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+      <div class="row g-3 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">First Name</label>
+          <input type="text" class="form-control" formControlName="firstName" placeholder="Jane"
+            [class.is-invalid]="form.get('firstName')?.invalid && form.get('firstName')?.touched">
+          @if (form.get('firstName')?.touched && form.get('firstName')?.invalid) {
+            <div class="invalid-feedback">First name must be at least 3 characters.</div>
+          }
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Last Name</label>
+          <input type="text" class="form-control" formControlName="lastName" placeholder="Doe"
+            [class.is-invalid]="form.get('lastName')?.invalid && form.get('lastName')?.touched">
+          @if (form.get('lastName')?.touched && form.get('lastName')?.invalid) {
+            <div class="invalid-feedback">Last name must be at least 3 characters.</div>
+          }
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Email</label>
+        <input type="email" class="form-control" formControlName="email" placeholder="you@example.com"
+          [class.is-invalid]="form.get('email')?.invalid && form.get('email')?.touched">
+        @if (form.get('email')?.touched && form.get('email')?.hasError('required')) {
+          <div class="invalid-feedback">Email is required.</div>
+        } @else if (form.get('email')?.touched && form.get('email')?.hasError('email')) {
+          <div class="invalid-feedback">Enter a valid email address.</div>
+        }
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Password</label>
+        <input type="password" class="form-control" formControlName="password" placeholder="••••••••"
+          [class.is-invalid]="form.get('password')?.invalid && form.get('password')?.touched">
+        @if (form.get('password')?.touched && form.get('password')?.hasError('passwordStrength')) {
+          <div class="invalid-feedback">{{ form.get('password')?.getError('passwordStrength') }}</div>
+        }
+        <div class="form-text">8–29 characters, at least one uppercase letter and one special character.</div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Confirm Password</label>
+        <input type="password" class="form-control" formControlName="confirmPassword" placeholder="••••••••"
+          [class.is-invalid]="form.hasError('passwordMismatch') && form.get('confirmPassword')?.touched">
+        @if (form.hasError('passwordMismatch') && form.get('confirmPassword')?.touched) {
+          <div class="invalid-feedback">Passwords do not match.</div>
+        }
+      </div>
+
+      <div class="mb-4 form-check">
+        <input type="checkbox" class="form-check-input" id="rememberMe" formControlName="rememberMe">
+        <label class="form-check-label" for="rememberMe">Remember me</label>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100" [disabled]="loading">
+        {{ loading ? 'Creating account…' : 'Create Account' }}
+      </button>
+    </form>
+
+    <hr>
+    <p class="text-center small text-muted mb-0">
+      Already have an account? <a routerLink="/sign-in">Sign in</a>
+    </p>
+  </div>
+</div>
