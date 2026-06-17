@@ -22,6 +22,9 @@ param managedIdentityClientId string
 @description('Key Vault URI (e.g., https://job-seeker-kv-dev.vault.azure.net/)')
 param keyVaultUri string
 
+@description('Principal ID of the User-Assigned Managed Identity (used by the web app to trigger this job)')
+param managedIdentityPrincipalId string
+
 var jobName = 'job-seeker-job-${environment}'
 
 resource containerAppJob 'Microsoft.App/jobs@2025-02-02-preview' = {
@@ -94,5 +97,17 @@ resource containerAppJob 'Microsoft.App/jobs@2025-02-02-preview' = {
         }
       ]
     }
+  }
+}
+
+// Contributor on the job — lets the web app's managed identity start job executions on demand
+var contributorRoleId = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+resource jobTriggerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerAppJob.id, managedIdentityPrincipalId, contributorRoleId)
+  scope: containerAppJob
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', contributorRoleId)
+    principalId: managedIdentityPrincipalId
+    principalType: 'ServicePrincipal'
   }
 }

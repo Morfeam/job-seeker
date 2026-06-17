@@ -1,4 +1,5 @@
 using Azure.Identity;
+using Azure.ResourceManager;
 using job_seeker.Server.Authorization;
 using job_seeker.Server.Operations.Email;
 using job_seeker.Server.Operations.Storage;
@@ -61,6 +62,8 @@ builder.Services.AddTransient<IResend, ResendClient>();
 
 builder.Services.AddSingleton<TokenHandler>();
 builder.Services.AddSingleton<ICustomerStorage, CustomerTableStorage>();
+builder.Services.AddSingleton<ICriteriaStorage, CriteriaTableStorage>();
+builder.Services.AddSingleton(new ArmClient(credential));
 builder.Services.AddScoped<ISendEmail, SendEmail>();
 
 // APPLICATIONINSIGHTS_CONNECTION_STRING is an App Service app setting — not available locally

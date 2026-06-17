@@ -122,6 +122,11 @@ resource customersTable 'Microsoft.Storage/storageAccounts/tableServices/tables@
   name: 'Customers'
 }
 
+resource customerCriteriaTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'CustomerCriteria'
+}
+
 // Storage Table Data Contributor — allows the managed identity to read/write table rows
 var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 resource tableRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -160,6 +165,7 @@ output loginServer string = containerEnvDeploy.outputs.loginServer
 output containerAppEnvironmentId string = containerEnvDeploy.outputs.containerAppEnvironmentId
 output managedIdentityId string = managedIdentity.id
 output managedIdentityClientId string = managedIdentity.properties.clientId
+output managedIdentityPrincipalId string = managedIdentity.properties.principalId
 output keyVaultUri string = keyVault.properties.vaultUri
 output apiUrl string = webAppDeploy.outputs.apiUrl
 output appServiceName string = webAppDeploy.outputs.appServiceName

@@ -87,6 +87,18 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
           name: 'KEY_VAULT_URI'
           value: keyVaultUri
         }
+        {
+          name: 'AZURE_SUBSCRIPTION_ID'
+          value: subscription().subscriptionId
+        }
+        {
+          name: 'AZURE_RESOURCE_GROUP'
+          value: resourceGroup().name
+        }
+        {
+          name: 'CONTAINER_JOB_NAME'
+          value: 'job-seeker-job-${environment}'
+        }
       ]
     }
   }

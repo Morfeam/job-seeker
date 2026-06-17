@@ -15,6 +15,7 @@ jobs:
       CONTAINER_APP_ENVIRONMENT_ID: ${{ steps.deploy-bicep.outputs.CONTAINER_APP_ENVIRONMENT_ID }}
       MANAGED_IDENTITY_ID: ${{ steps.deploy-bicep.outputs.MANAGED_IDENTITY_ID }}
       MANAGED_IDENTITY_CLIENT_ID: ${{ steps.deploy-bicep.outputs.MANAGED_IDENTITY_CLIENT_ID }}
+      MANAGED_IDENTITY_PRINCIPAL_ID: ${{ steps.deploy-bicep.outputs.MANAGED_IDENTITY_PRINCIPAL_ID }}
       KEY_VAULT_URI: ${{ steps.deploy-bicep.outputs.KEY_VAULT_URI }}
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +40,7 @@ jobs:
           echo "CONTAINER_APP_ENVIRONMENT_ID=$(echo $OUTPUT | jq -r '.containerAppEnvironmentId.value')" >> $GITHUB_OUTPUT
           echo "MANAGED_IDENTITY_ID=$(echo $OUTPUT | jq -r '.managedIdentityId.value')" >> $GITHUB_OUTPUT
           echo "MANAGED_IDENTITY_CLIENT_ID=$(echo $OUTPUT | jq -r '.managedIdentityClientId.value')" >> $GITHUB_OUTPUT
+          echo "MANAGED_IDENTITY_PRINCIPAL_ID=$(echo $OUTPUT | jq -r '.managedIdentityPrincipalId.value')" >> $GITHUB_OUTPUT
           echo "KEY_VAULT_URI=$(echo $OUTPUT | jq -r '.keyVaultUri.value')" >> $GITHUB_OUTPUT
 
   publish-docker:
@@ -92,6 +94,7 @@ jobs:
               containerAppEnvironmentId=${{ needs.deploy-infra.outputs.CONTAINER_APP_ENVIRONMENT_ID }} \
               managedIdentityId="$MANAGED_IDENTITY_ID" \
               managedIdentityClientId=${{ needs.deploy-infra.outputs.MANAGED_IDENTITY_CLIENT_ID }} \
+              managedIdentityPrincipalId=${{ needs.deploy-infra.outputs.MANAGED_IDENTITY_PRINCIPAL_ID }} \
               keyVaultUri="$KEY_VAULT_URI"
 
       - name: Disable Container Job Schedule

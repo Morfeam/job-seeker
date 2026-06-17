@@ -47,6 +47,8 @@ def setup_and_parse_args() -> argparse.Namespace:
                         help="Logging verbosity: debug=info+, standard=warning+ only, none=silent (default: standard)")
     parser.add_argument("--customer-id", type=str, default="00000000-0000-0000-0000-000000000000",
                         help="Customer/persona ID — determines criteria file and blob folder (default: empty guid)")
+    parser.add_argument("--criteria-id", type=str, default="default",
+                        help="Criteria blob ID — determines which criteria file to load (default: 'default')")
     return parser.parse_args()
 
 
@@ -71,7 +73,7 @@ def main() -> None:
     log.info(f"Customer ID: {customer_id}")
 
     log.info("Loading search criteria from Azure Blob Storage...")
-    criteria = load_criteria(customer_id)
+    criteria = load_criteria(customer_id, args.criteria_id)
     keywords: list[str] = criteria["keywords"]
     location: str = criteria["location"]
     distance: int | None = criteria.get("distance")

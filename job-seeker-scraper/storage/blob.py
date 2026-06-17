@@ -25,8 +25,8 @@ def _get_blob_service_client() -> BlobServiceClient:
     return BlobServiceClient.from_connection_string(_get_connection_string())
 
 
-def load_criteria(customer_id: str) -> dict:
-    blob_name = f"{customer_id}/criteria.json"
+def load_criteria(customer_id: str, criteria_id: str = "default") -> dict:
+    blob_name = f"{customer_id}/{criteria_id}.json"
     client = _get_blob_service_client().get_blob_client(container=CRITERIA_CONTAINER, blob=blob_name)
     return json.loads(client.download_blob().readall())
 
