@@ -175,6 +175,7 @@ public class JobSeekerController : ControllerBase
         "--scrape-ziprecruiter", "false",
         "--customer-id", customerId,
         "--criteria-id", request.CriteriaId,
+        "--enrich", "true",
     ];
 
     private static string Bool(bool value) => value ? "true" : "false";

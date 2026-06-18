@@ -96,7 +96,8 @@ Route: `[Route("job-seeker")]`
   var job = _armClient.GetContainerAppJobResource(jobId);
   ```
 - Build `ContainerAppJobExecutionTemplate` with container name `"job-seeker"` and args:
-  `--scrape-indeed {true|false} --scrape-linkedin {true|false} --scrape-ziprecruiter false --customer-id {customerId} --criteria-id {criteriaId}`
+  `--scrape-indeed {true|false} --scrape-linkedin {true|false} --scrape-ziprecruiter false --customer-id {customerId} --criteria-id {criteriaId} --enrich true`
+- AI enrichment is always on for web-app-triggered scrapes (`--enrich true` in `BuildArgs`); requires the `ANTHROPIC_API_KEY` env var (from the `anthropic-api-key` Key Vault secret on the container job, which the web app's execution inherits).
 - Call `await job.StartAsync(WaitUntil.Started, template)`
 - Return `202 Accepted` on success
 - `RequestFailedException` Status 404 → `404`; Status 409 → `409 { error = ex.Message }`; other → `409 { error = "Failed to start job." }`

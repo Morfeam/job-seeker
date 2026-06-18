@@ -69,6 +69,11 @@ resource containerAppJob 'Microsoft.App/jobs@2025-02-02-preview' = {
           keyVaultUrl: '${keyVaultUri}secrets/recipient-email'
           identity: managedIdentityId
         }
+        {
+          name: 'anthropic-api-key'
+          keyVaultUrl: '${keyVaultUri}secrets/anthropic-api-key'
+          identity: managedIdentityId
+        }
       ]
     }
     template: {
@@ -92,6 +97,10 @@ resource containerAppJob 'Microsoft.App/jobs@2025-02-02-preview' = {
             {
               name: 'RECIPIENT_EMAIL'
               secretRef: 'recipient-email'
+            }
+            {
+              name: 'ANTHROPIC_API_KEY'
+              secretRef: 'anthropic-api-key'
             }
           ]
         }
