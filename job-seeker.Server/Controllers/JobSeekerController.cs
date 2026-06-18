@@ -92,6 +92,11 @@ public class JobSeekerController : ControllerBase
                 Image = sourceContainer.Image,
                 Resources = sourceContainer.Resources,
             };
+            // The override replaces the container definition wholesale, so the job's
+            // env vars (e.g. the AZURE_STORAGE_CONNECTION_STRING secretRef) must be
+            // carried over or the scraper starts with a blank connection string.
+            foreach (var env in sourceContainer.Env)
+                execContainer.Env.Add(env);
             foreach (var arg in BuildArgs(request, customerId))
                 execContainer.Args.Add(arg);
 
