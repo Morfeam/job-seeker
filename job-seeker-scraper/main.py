@@ -12,7 +12,7 @@ from scrapers.indeed import scrape_indeed
 from scrapers.linkedin import scrape_linkedin
 from processing.normalize import normalize_job
 from processing.enrich import enrich_job
-from storage.blob import load_criteria, save_job, job_exists, blob_name
+from storage.blob import load_criteria, save_job, job_exists, blob_file_name
 from storage.table import upsert_job
 from notifications.email import send_results_email
 
@@ -139,7 +139,7 @@ def main() -> None:
     saved, skipped = 0, 0
     for job in normalized:
         if save_job(job, customer_id):
-            upsert_job(job.id, blob_name(job, customer_id), customer_id)
+            upsert_job(job.id, blob_file_name(job), customer_id, args.criteria_id)
             saved += 1
         else:
             skipped += 1

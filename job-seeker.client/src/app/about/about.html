@@ -1,10 +1,74 @@
-<div class="container py-5" style="max-width: 720px;">
-  <h2 class="fw-bold mb-4">About Matt's Job Seeker</h2>
-  <p class="text-muted">
-    Matt's Job Seeker is a personal job search automation tool. It scrapes job boards daily, uses AI to extract
-    key insights from job descriptions, and surfaces the most relevant opportunities based on your own criteria.
-  </p>
-  <p class="text-muted">
-    Built with Python, .NET 10, Angular 20, and Azure — powered by the Claude API.
-  </p>
+<!-- Banner (compact hero) -->
+<section class="py-4 bg-primary text-white text-center">
+  <div class="container py-2">
+    <h1 class="display-5 fw-bold mb-0">About the Job Seeker</h1>
+  </div>
+</section>
+
+<div class="container py-5" style="max-width: 760px;">
+
+  <!-- Section 1: Purpose -->
+  <section class="mb-5">
+    <h2 class="fw-bold mb-3">The Purpose</h2>
+    <p class="text-muted">
+      The purpose of this job seeker is to provide a means for myself and others to look for jobs in a
+      programmatic way, as opposed to constantly having to sift through thousands of job postings online.
+      The user provides keywords, salary, and other criteria related to the jobs that they are looking for.
+      Then the job seeker searches the following sites for job postings that match their criteria.
+    </p>
+    <p class="text-muted mb-2">
+      We offer the ability to search on the following job boards (with even more in the works):
+    </p>
+    <ul class="text-muted">
+      <li>Indeed</li>
+      <li>LinkedIn</li>
+      <li>Ziprecruiter <span class="badge bg-secondary">soon</span></li>
+      <li>Google Jobs <span class="badge bg-secondary">soon</span></li>
+      <li>Glassdoor <span class="badge bg-secondary">soon</span></li>
+    </ul>
+  </section>
+
+  <!-- Section 2: The Tech -->
+  <section class="mb-5">
+    <h2 class="fw-bold mb-3">The Tech</h2>
+    <p class="text-muted">
+      Under the hood, this site wraps around a Docker container running Playwright and JobSpy to search for
+      jobs across an aggregate of sites. Criteria is stored in an Azure storage account, supplied to the
+      aforementioned container app via a backend ASP.NET Core application.
+    </p>
+    <dl class="row text-muted mb-0">
+      <dt class="col-sm-3">Frontend</dt>
+      <dd class="col-sm-9">Angular 20, Bootstrap 5.3, CSS</dd>
+
+      <dt class="col-sm-3">Backend</dt>
+      <dd class="col-sm-9">.NET 10 ASP.NET Core, Python, Docker Containers</dd>
+
+      <dt class="col-sm-3">Hosting &amp; Storage</dt>
+      <dd class="col-sm-9">Azure Container App Jobs, Azure Blob and Table Storage, Azure Web API</dd>
+    </dl>
+  </section>
+
+  <!-- Section 3: Source & Credits -->
+  <section>
+    <h2 class="fw-bold mb-3">Source &amp; Credits</h2>
+    <p class="text-muted">
+      This project is open source. Browse the code on
+      <a href="https://github.com/Morfeam/job-seeker" target="_blank" rel="noopener">GitHub</a>.
+    </p>
+    <p class="text-muted mb-2">
+      Major credit goes to the following dependencies, which power the Python script that matches job
+      postings to a user's search criteria:
+    </p>
+    <ul class="text-muted">
+      <li>
+        <a href="https://github.com/microsoft/playwright" target="_blank" rel="noopener">Playwright</a>
+        — browser automation used to render and scrape job boards.
+      </li>
+      <li>
+        <a href="https://github.com/speedyapply/JobSpy" target="_blank" rel="noopener">JobSpy</a>
+        — job board scraping library aggregating listings across multiple sites.
+      </li>
+    </ul>
+  </section>
+
 </div>

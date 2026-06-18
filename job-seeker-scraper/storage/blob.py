@@ -31,9 +31,14 @@ def load_criteria(customer_id: str, criteria_id: str = "default") -> dict:
     return json.loads(client.download_blob().readall())
 
 
-def blob_name(job: NormalizedJob, customer_id: str) -> str:
+def blob_file_name(job: NormalizedJob) -> str:
+    """Just the blob's file name, e.g. linkedin_li-4327290738_software_engineer__iii.json"""
     sanitized_title = re.sub(r"[^a-z0-9]", "_", job.title.lower())[:50].strip("_")
-    return f"{customer_id}/{job.source}_{job.id}_{sanitized_title}.json"
+    return f"{job.source}_{job.id}_{sanitized_title}.json"
+
+
+def blob_name(job: NormalizedJob, customer_id: str) -> str:
+    return f"{customer_id}/{blob_file_name(job)}"
 
 
 def job_exists(job: NormalizedJob, customer_id: str) -> bool:
