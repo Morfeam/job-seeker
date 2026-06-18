@@ -1,0 +1,128 @@
+<!-- Banner (compact hero, matches About page) -->
+<section class="py-4 bg-primary text-white text-center">
+  <div class="container py-2 d-flex flex-wrap align-items-center justify-content-center gap-3">
+    <h1 class="display-5 fw-bold mb-0">My Jobs</h1>
+    @if (!loading) {
+      <select class="form-select w-auto" (change)="onFilter($any($event.target).value)">
+        <option value="all">All criteria</option>
+        @for (c of criteriaOptions; track c.id) {
+          <option [value]="c.id">{{ c.name }}</option>
+        }
+      </select>
+    }
+  </div>
+</section>
+
+@if (loading) {
+  <div class="container py-5 text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading…</span>
+    </div>
+  </div>
+} @else {
+  <div class="container py-5" style="max-width: 820px;">
+
+    @if (visibleJobs.length === 0) {
+      <p class="text-muted text-center">No jobs found yet. Start a job search from your dashboard.</p>
+    }
+
+    @for (job of visibleJobs; track $index; let i = $index) {
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+
+          <!-- Header: board icon + title/company/location/salary -->
+          <div class="d-flex">
+            <!-- Job board icon placeholder -->
+            <span class="d-inline-block bg-dark rounded me-3 flex-shrink-0" style="width: 2.5rem; height: 2.5rem;"
+                  [title]="job.source ?? ''"></span>
+            <div class="flex-grow-1">
+              <h5 class="fw-bold mb-1">
+                @if (job.jobUrl) {
+                  <a [href]="job.jobUrl" target="_blank" rel="noopener" class="text-decoration-none">{{ job.title }}</a>
+                } @else {
+                  {{ job.title }}
+                }
+              </h5>
+              <div class="text-muted">
+                <span class="fw-semibold">{{ job.company }}</span>
+                @if (job.location) { <span> · {{ job.location }}</span> }
+                @if (job.isRemote) { <span class="badge bg-info text-dark ms-1">Remote</span> }
+              </div>
+              @if (job.salary) {
+                <div class="text-success fw-semibold mt-1">{{ job.salary }}</div>
+              }
+            </div>
+          </div>
+
+          <!-- AI-extracted requirements -->
+          @if (job.yearsExperience || job.technologies?.length || job.hardRequirements?.length || job.softRequirements?.length) {
+            <div class="mt-3 pt-3 border-top">
+              <h6 class="text-uppercase text-muted small fw-bold mb-2">
+                <i class="bi bi-stars me-1"></i>AI Insights
+              </h6>
+
+              @if (job.yearsExperience) {
+                <p class="mb-2"><span class="fw-semibold">Experience:</span> {{ job.yearsExperience }}+ years</p>
+              }
+
+              @if (job.technologies?.length) {
+                <div class="mb-2">
+                  <div class="fw-semibold mb-1">Technologies</div>
+                  @for (tech of job.technologies; track tech.name) {
+                    <span class="badge me-1 mb-1" [class.bg-primary]="tech.isPreferred" [class.bg-secondary]="!tech.isPreferred">
+                      {{ tech.name }}@if (tech.yearsExperience) { <span> · {{ tech.yearsExperience }}y</span> }
+                    </span>
+                  }
+                </div>
+              }
+
+              @if (job.hardRequirements?.length) {
+                <div class="mb-2">
+                  <div class="fw-semibold mb-1">Hard requirements</div>
+                  <ul class="mb-0 small text-muted">
+                    @for (req of job.hardRequirements; track req) { <li>{{ req }}</li> }
+                  </ul>
+                </div>
+              }
+
+              @if (job.softRequirements?.length) {
+                <div class="mb-2">
+                  <div class="fw-semibold mb-1">Soft requirements</div>
+                  <ul class="mb-0 small text-muted">
+                    @for (req of job.softRequirements; track req) { <li>{{ req }}</li> }
+                  </ul>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Collapsible summary -->
+          @if (job.aiSummary) {
+            <div class="mt-3">
+              <button class="btn btn-sm btn-outline-secondary" type="button"
+                      data-bs-toggle="collapse" [attr.data-bs-target]="'#summary' + i">
+                <i class="bi bi-chevron-down me-1"></i>Job summary
+              </button>
+              <div class="collapse mt-2" [id]="'summary' + i">
+                <div class="card card-body bg-light small">{{ job.aiSummary }}</div>
+              </div>
+            </div>
+          }
+
+          <!-- Footer: posted date -->
+          @if (job.datePosted) {
+            <div class="text-muted small mt-3">
+              <i class="bi bi-calendar3 me-1"></i>Posted {{ job.datePosted | date: 'mediumDate' }}
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    @if (hasMore) {
+      <div class="text-center">
+        <button class="btn btn-outline-primary" (click)="loadMore()">Load more jobs</button>
+      </div>
+    }
+  </div>
+}

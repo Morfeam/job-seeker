@@ -13,6 +13,8 @@ import { SignUp } from './sign-up/sign-up';
 import { ForgotPassword } from './forgot-password/forgot-password';
 import { ResetPassword } from './reset-password/reset-password';
 import { Dashboard } from './dashboard/dashboard';
+import { UserJobs } from './user-jobs/user-jobs';
+import { ErrorPage } from './error/error';
 
 @NgModule({
   declarations: [
@@ -25,6 +27,8 @@ import { Dashboard } from './dashboard/dashboard';
     ForgotPassword,
     ResetPassword,
     Dashboard,
+    UserJobs,
+    ErrorPage,
   ],
   imports: [
     BrowserModule,

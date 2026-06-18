@@ -139,6 +139,18 @@ resource tableRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01
   }
 }
 
+// Storage Blob Data Reader — allows the web app's managed identity to read job-result blobs
+var storageBlobDataReaderRoleId = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
+resource blobRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, managedIdentity.id, storageBlobDataReaderRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataReaderRoleId)
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 module webAppDeploy './webapp.bicep' = {
   name: 'webAppDeploy'
   params: {
@@ -147,6 +159,7 @@ module webAppDeploy './webapp.bicep' = {
     userAssignedIdentityId: managedIdentity.id
     userAssignedIdentityClientId: managedIdentity.properties.clientId
     tableServiceEndpoint: storageAccount.properties.primaryEndpoints.table
+    blobServiceEndpoint: storageAccount.properties.primaryEndpoints.blob
     keyVaultUri: keyVault.properties.vaultUri
   }
 }

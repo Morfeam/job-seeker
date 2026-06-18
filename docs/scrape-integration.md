@@ -212,3 +212,34 @@ resource jobTriggerRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-
 3. **Validation**: Submit with no sources checked → inline error, button stays disabled
 4. **Error path**: Set `CONTAINER_JOB_NAME` to an invalid name → red toast with error message
 5. **Post-deploy**: Trigger from live site → verify execution started, blobs saved under `{customerId}/{criteriaId}/`, `JobLinks` table updated
+
+---
+
+## Addendum A: Displaying scraped jobs
+
+### Context
+Once a scrape has run, its results live as JSON blobs in `job-seeker-results/{customerId}/{blobFileName}` with a matching row in the `JobLinks` table (`BlobFileName`, `criteriaId`). This addendum adds a **My Jobs** page so a signed-in user can browse the jobs found for them, grouped and filterable by criteria.
+
+### Backend — `GET /job-seeker/get-jobs` `[Authorize]`
+Returns the user's most recent jobs (cap **100**), grouped by criteria.
+
+- **Storage additions**
+  - `IJobLinkStorage` / `JobLinkTableStorage` — `GetRecentByCustomerIdAsync(customerId, max)`: queries `JobLinks` by `PartitionKey eq customerId`, sorts by `Timestamp` desc in-memory (Table Storage has no server-side ordering), returns top `max` as `JobLink { JobId, BlobFileName, CriteriaId, Timestamp }`.
+  - `IJobResultStorage` / `JobResultBlobStorage` — `GetJobAsync(customerId, blobFileName)`: downloads `job-seeker-results/{customerId}/{blobFileName}`, deserializes into `JobResult` with `JsonNamingPolicy.SnakeCaseLower` (maps the scraper's snake_case JSON). Returns `null` on 404 so orphaned link rows are skipped.
+- **Models**: `JobResult` (mirrors `NormalizedJob`), `JobTechnology`, `CriteriaJobsGroup { criteriaId, criteriaName, jobs[] }`, `JobLink`.
+- **Controller flow** (`JobSeekerController.GetJobs`): get customerId from JWT → fetch recent links → read each blob in parallel (`Task.WhenAll`) → resolve `criteriaId → name` via `ICriteriaStorage` (fallback `"Uncategorized"` for empty/unknown) → `GroupBy(criteriaId)` → return `List<CriteriaJobsGroup>`.
+- **DI / config**: register `BlobServiceClient` in `Program.cs` (`AddBlobServiceClient`) using `AZURE_BLOB_SERVICE_ENDPOINT` + managed identity in Azure, or `storage-connection-string` locally. New `AZURE_BLOB_SERVICE_ENDPOINT` app setting wired through `main.bicep` → `webapp.bicep` from `storageAccount.properties.primaryEndpoints.blob`. Adds `Azure.Storage.Blobs` package.
+
+### Frontend — `UserJobs` component, route `/my-jobs`
+- Reached from the dashboard **My Jobs** card (now a `routerLink="/my-jobs"` button).
+- On init: auth-guard (redirect `/sign-in` if no token) → `GET /job-seeker/get-jobs`. Shows a **blue spinner** until the response returns; on error **routes to `/error`** (new `ErrorPage` component, route `/error`).
+- **Header** matches the About banner style (`py-4 bg-primary text-white`) showing **"My Jobs"** plus a criteria **filter dropdown** (`All criteria` + one option per returned group). Changing the filter resets paging.
+- **Paging**: renders 10 job cards; a **"Load more jobs"** button reveals 10 more, up to the 100 returned.
+- **Job card** contains: (1) a placeholder black box icon for the job board (`job.source`), (2) title (links to `job_url`), company, location, salary, (3) an **AI Insights** section — `yearsExperience`, `technologies` (badges; preferred highlighted), `hardRequirements`, `softRequirements`, (4) a **collapsible** area (Bootstrap collapse) showing `aiSummary`, (5) the posted date (`datePosted`).
+
+### Verification (Addendum A)
+1. Signed in with at least one scraped job → dashboard **My Jobs** button → `/my-jobs` shows a blue spinner, then job cards.
+2. Filter dropdown narrows cards to a single criteria; paging resets to 10.
+3. "Load more jobs" appears only when >10 jobs match; reveals 10 more each click up to 100.
+4. Each card: board icon, title links out, AI insights populated when enrichment ran, summary expands/collapses, posted date shown.
+5. Force a backend failure (e.g. stop the API) → page routes to `/error`.

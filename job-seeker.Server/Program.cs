@@ -22,18 +22,23 @@ if (!string.IsNullOrEmpty(keyVaultUri))
     builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), credential);
 }
 
-// AZURE_TABLE_SERVICE_ENDPOINT is a non-secret app setting injected by webapp.bicep
+// AZURE_TABLE_SERVICE_ENDPOINT / AZURE_BLOB_SERVICE_ENDPOINT are non-secret app settings
+// injected by webapp.bicep. Locally we fall back to storage-connection-string.
 builder.Services.AddAzureClients(b =>
 {
     var tableEndpoint = builder.Configuration["AZURE_TABLE_SERVICE_ENDPOINT"];
+    var blobEndpoint = builder.Configuration["AZURE_BLOB_SERVICE_ENDPOINT"];
     if (!string.IsNullOrEmpty(tableEndpoint))
     {
         b.AddTableServiceClient(new Uri(tableEndpoint));
+        b.AddBlobServiceClient(new Uri(blobEndpoint!));
         b.UseCredential(credential);
     }
     else
     {
-        b.AddTableServiceClient(builder.Configuration["storage-connection-string"]);
+        var connectionString = builder.Configuration["storage-connection-string"];
+        b.AddTableServiceClient(connectionString);
+        b.AddBlobServiceClient(connectionString);
     }
 });
 
@@ -63,6 +68,8 @@ builder.Services.AddTransient<IResend, ResendClient>();
 builder.Services.AddSingleton<TokenHandler>();
 builder.Services.AddSingleton<ICustomerStorage, CustomerTableStorage>();
 builder.Services.AddSingleton<ICriteriaStorage, CriteriaTableStorage>();
+builder.Services.AddSingleton<IJobLinkStorage, JobLinkTableStorage>();
+builder.Services.AddSingleton<IJobResultStorage, JobResultBlobStorage>();
 builder.Services.AddSingleton(new ArmClient(credential));
 builder.Services.AddScoped<ISendEmail, SendEmail>();
 

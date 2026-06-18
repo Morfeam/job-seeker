@@ -16,16 +16,25 @@ public class JobSeekerController : ControllerBase
     // Name of the container inside the Container App Job whose args we override.
     private const string ScraperContainerName = "job-seeker";
 
+    // Most recent jobs returned by GET /get-jobs.
+    private const int MaxJobs = 100;
+
     private readonly ICriteriaStorage _criteriaStorage;
+    private readonly IJobLinkStorage _jobLinkStorage;
+    private readonly IJobResultStorage _jobResultStorage;
     private readonly ArmClient _armClient;
     private readonly IConfiguration _config;
 
     public JobSeekerController(
         ICriteriaStorage criteriaStorage,
+        IJobLinkStorage jobLinkStorage,
+        IJobResultStorage jobResultStorage,
         ArmClient armClient,
         IConfiguration config)
     {
         _criteriaStorage = criteriaStorage;
+        _jobLinkStorage = jobLinkStorage;
+        _jobResultStorage = jobResultStorage;
         _armClient = armClient;
         _config = config;
     }
@@ -50,6 +59,44 @@ public class JobSeekerController : ControllerBase
                 .Select(c => new CriteriaItem { Id = c.Id, Name = c.Name })
                 .ToList(),
         });
+    }
+
+    [Authorize]
+    [HttpGet("get-jobs")]
+    public async Task<IActionResult> GetJobs()
+    {
+        var customerId = GetCustomerId();
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+
+        var links = await _jobLinkStorage.GetRecentByCustomerIdAsync(customerId, MaxJobs);
+
+        // Read each job's blob in parallel, preserving its criteria association.
+        var loaded = await Task.WhenAll(links.Select(async link =>
+            (link.CriteriaId, Job: await _jobResultStorage.GetJobAsync(customerId, link.BlobFileName))));
+
+        // Resolve criteria id -> display name.
+        var criteria = await _criteriaStorage.GetByCustomerIdAsync(customerId);
+        var nameById = criteria
+            .GroupBy(c => c.Id)
+            .ToDictionary(g => g.Key, g => g.First().Name);
+
+        var groups = loaded
+            .Where(x => x.Job != null)
+            .GroupBy(x => x.CriteriaId)
+            .Select(g => new CriteriaJobsGroup
+            {
+                CriteriaId = g.Key,
+                CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
+                    ? name
+                    : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
+                Jobs = g.Select(x => x.Job!)
+                    .OrderByDescending(j => ParsePostedDate(j.DatePosted))
+                    .ToList(),
+            })
+            .ToList();
+
+        return Ok(groups);
     }
 
     [Authorize]
@@ -131,4 +178,14 @@ public class JobSeekerController : ControllerBase
     ];
 
     private static string Bool(bool value) => value ? "true" : "false";
+
+    // Jobs without a parseable date_posted sort last (oldest).
+    private static DateTimeOffset ParsePostedDate(string? value) =>
+        DateTimeOffset.TryParse(
+            value,
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal,
+            out var parsed)
+            ? parsed
+            : DateTimeOffset.MinValue;
 }

@@ -16,6 +16,9 @@ param sku string = 'B1'
 @description('Azure Table Storage service endpoint URL')
 param tableServiceEndpoint string
 
+@description('Azure Blob Storage service endpoint URL')
+param blobServiceEndpoint string
+
 @description('Key Vault URI for loading secrets at runtime')
 param keyVaultUri string
 
@@ -82,6 +85,10 @@ resource appService 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'AZURE_TABLE_SERVICE_ENDPOINT'
           value: tableServiceEndpoint
+        }
+        {
+          name: 'AZURE_BLOB_SERVICE_ENDPOINT'
+          value: blobServiceEndpoint
         }
         {
           name: 'KEY_VAULT_URI'
