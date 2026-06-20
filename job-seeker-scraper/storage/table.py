@@ -14,33 +14,38 @@ def _get_table_client():
     return service.get_table_client(TABLE_NAME)
 
 
-def upsert_job(job_id: str, job_blob_name: str, customer_id: str) -> None:
-    """Upsert a job into the JobLinks table. Resume, cover letter, and criteria are empty until assigned."""
+def upsert_job(job_id: str, blob_file_name: str, customer_id: str, criteria_id: str = EMPTY_GUID) -> None:
+    """Upsert a job into the JobLinks table. Resume and cover letter are empty until assigned.
+
+    blob_file_name is the exact blob file name in job-seeker-results,
+    e.g. linkedin_li-4327290738_software_engineer__iii.json
+    criteria_id is the RowKey of the CustomerCriteria row that produced this job.
+    """
     entity: TableEntity = {
         "PartitionKey": customer_id,
         "RowKey": job_id,
         "customerId": customer_id,
-        "jobSearchId": job_blob_name,
+        "BlobFileName": blob_file_name,
         "resumeId": EMPTY_GUID,
         "coverLetterId": EMPTY_GUID,
-        "criteriaId": EMPTY_GUID,
+        "criteriaId": criteria_id,
     }
     _get_table_client().upsert_entity(entity)
 
 
 def upsert_job_link(
     customer_id: str,
-    job_search_id: str,
+    blob_file_name: str,
     resume_id: str | None = None,
     cover_letter_id: str | None = None,
     criteria_id: str | None = None,
 ) -> None:
-    """Insert or update a JobLinks record linking a job search run to its related artifacts."""
+    """Insert or update a JobLinks record linking a job posting to its related artifacts."""
     entity: TableEntity = {
         "PartitionKey": customer_id,
-        "RowKey": job_search_id,
+        "RowKey": blob_file_name,
         "customerId": customer_id,
-        "jobSearchId": job_search_id,
+        "BlobFileName": blob_file_name,
         "resumeId": resume_id or "",
         "coverLetterId": cover_letter_id or "",
         "criteriaId": criteria_id or "",

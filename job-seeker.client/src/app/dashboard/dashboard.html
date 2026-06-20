@@ -13,6 +13,60 @@
     </div>
   </section>
 
+  <!-- Start a Job Search -->
+  <section class="py-4 border-bottom">
+    <div class="container">
+      <form [formGroup]="scrapeForm" (ngSubmit)="onScrape()" class="d-flex flex-wrap align-items-center justify-content-center gap-3">
+        <h5 class="fw-semibold mb-0">Start a Job Search</h5>
+
+        <!-- Criteria -->
+        <div class="d-flex align-items-center gap-2">
+          <label for="criteriaId" class="form-label mb-0">Criteria</label>
+          <select id="criteriaId" class="form-select w-auto" formControlName="criteriaId">
+            <option value="" disabled>
+              {{ criteria.length ? 'Select criteria…' : 'No criteria found' }}
+            </option>
+            @for (c of criteria; track c.id) {
+              <option [value]="c.id">{{ c.name }}</option>
+            }
+          </select>
+        </div>
+
+        <!-- Sources -->
+        <div class="form-check">
+          <input id="scrapeIndeed" type="checkbox" class="form-check-input" formControlName="scrapeIndeed" />
+          <label for="scrapeIndeed" class="form-check-label">Indeed</label>
+        </div>
+        <div class="form-check">
+          <input id="scrapeLinkedin" type="checkbox" class="form-check-input" formControlName="scrapeLinkedin" />
+          <label for="scrapeLinkedin" class="form-check-label">LinkedIn</label>
+        </div>
+        <div class="form-check">
+          <input id="scrapeZiprecruiter" type="checkbox" class="form-check-input" disabled />
+          <label for="scrapeZiprecruiter" class="form-check-label text-muted">ZipRecruiter (unavailable)</label>
+        </div>
+
+        <!-- Submit -->
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="scrapeForm.invalid || isScraping || !atLeastOneSourceSelected()"
+        >
+          @if (isScraping) {
+            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+          }
+          Start Scrape
+        </button>
+      </form>
+
+      @if (!atLeastOneSourceSelected() && scrapeForm.dirty) {
+        <div class="text-center mt-2">
+          <small class="text-danger">Select at least one job source.</small>
+        </div>
+      }
+    </div>
+  </section>
+
   <!-- Placeholder cards -->
   <section class="py-5">
     <div class="container">
@@ -22,7 +76,7 @@
             <i class="bi bi-briefcase fs-1 text-primary mb-3"></i>
             <h5 class="fw-bold">My Jobs</h5>
             <p class="text-muted small">View and manage jobs found for your profile.</p>
-            <span class="badge bg-secondary">Coming soon</span>
+            <a routerLink="/my-jobs" class="btn btn-primary mt-auto">My Jobs</a>
           </div>
         </div>
         <div class="col-md-4">
@@ -44,4 +98,20 @@
       </div>
     </div>
   </section>
+
+  <!-- Toasts -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+    <div #successToast class="toast text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">Job search started successfully!</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+    <div #errorToast class="toast text-bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">{{ toastMessage }}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
 }

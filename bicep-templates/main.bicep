@@ -122,6 +122,11 @@ resource customersTable 'Microsoft.Storage/storageAccounts/tableServices/tables@
   name: 'Customers'
 }
 
+resource customerCriteriaTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'CustomerCriteria'
+}
+
 // Storage Table Data Contributor — allows the managed identity to read/write table rows
 var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 resource tableRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -129,6 +134,18 @@ resource tableRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageTableDataContributorRoleId)
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Storage Blob Data Reader — allows the web app's managed identity to read job-result blobs
+var storageBlobDataReaderRoleId = '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
+resource blobRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, managedIdentity.id, storageBlobDataReaderRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataReaderRoleId)
     principalId: managedIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
@@ -142,6 +159,7 @@ module webAppDeploy './webapp.bicep' = {
     userAssignedIdentityId: managedIdentity.id
     userAssignedIdentityClientId: managedIdentity.properties.clientId
     tableServiceEndpoint: storageAccount.properties.primaryEndpoints.table
+    blobServiceEndpoint: storageAccount.properties.primaryEndpoints.blob
     keyVaultUri: keyVault.properties.vaultUri
   }
 }
@@ -160,6 +178,7 @@ output loginServer string = containerEnvDeploy.outputs.loginServer
 output containerAppEnvironmentId string = containerEnvDeploy.outputs.containerAppEnvironmentId
 output managedIdentityId string = managedIdentity.id
 output managedIdentityClientId string = managedIdentity.properties.clientId
+output managedIdentityPrincipalId string = managedIdentity.properties.principalId
 output keyVaultUri string = keyVault.properties.vaultUri
 output apiUrl string = webAppDeploy.outputs.apiUrl
 output appServiceName string = webAppDeploy.outputs.appServiceName

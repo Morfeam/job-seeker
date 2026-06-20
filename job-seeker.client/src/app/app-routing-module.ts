@@ -8,6 +8,8 @@ import { SignUp } from './sign-up/sign-up';
 import { ForgotPassword } from './forgot-password/forgot-password';
 import { ResetPassword } from './reset-password/reset-password';
 import { Dashboard } from './dashboard/dashboard';
+import { UserJobs } from './user-jobs/user-jobs';
+import { ErrorPage } from './error/error';
 
 const routes: Routes = [
   { path: '', component: Home },
@@ -17,6 +19,8 @@ const routes: Routes = [
   { path: 'forgot-password', component: ForgotPassword },
   { path: 'reset-password/:id', component: ResetPassword },
   { path: 'dashboard', component: Dashboard },
+  { path: 'my-jobs', component: UserJobs },
+  { path: 'error', component: ErrorPage },
   { path: '**', redirectTo: '' },
 ];
 
