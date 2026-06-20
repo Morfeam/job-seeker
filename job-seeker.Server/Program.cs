@@ -68,6 +68,7 @@ builder.Services.AddTransient<IResend, ResendClient>();
 builder.Services.AddSingleton<TokenHandler>();
 builder.Services.AddSingleton<ICustomerStorage, CustomerTableStorage>();
 builder.Services.AddSingleton<ICriteriaStorage, CriteriaTableStorage>();
+builder.Services.AddSingleton<ICriteriaKeywordsStorage, CriteriaKeywordsBlobStorage>();
 builder.Services.AddSingleton<IJobLinkStorage, JobLinkTableStorage>();
 builder.Services.AddSingleton<IJobResultStorage, JobResultBlobStorage>();
 builder.Services.AddSingleton(new ArmClient(credential));

@@ -20,6 +20,7 @@ public class JobSeekerController : ControllerBase
     private const int MaxJobs = 100;
 
     private readonly ICriteriaStorage _criteriaStorage;
+    private readonly ICriteriaKeywordsStorage _criteriaKeywordsStorage;
     private readonly IJobLinkStorage _jobLinkStorage;
     private readonly IJobResultStorage _jobResultStorage;
     private readonly ArmClient _armClient;
@@ -27,12 +28,14 @@ public class JobSeekerController : ControllerBase
 
     public JobSeekerController(
         ICriteriaStorage criteriaStorage,
+        ICriteriaKeywordsStorage criteriaKeywordsStorage,
         IJobLinkStorage jobLinkStorage,
         IJobResultStorage jobResultStorage,
         ArmClient armClient,
         IConfiguration config)
     {
         _criteriaStorage = criteriaStorage;
+        _criteriaKeywordsStorage = criteriaKeywordsStorage;
         _jobLinkStorage = jobLinkStorage;
         _jobResultStorage = jobResultStorage;
         _armClient = armClient;
@@ -81,20 +84,22 @@ public class JobSeekerController : ControllerBase
             .GroupBy(c => c.Id)
             .ToDictionary(g => g.Key, g => g.First().Name);
 
-        var groups = loaded
+        var grouped = loaded
             .Where(x => x.Job != null)
             .GroupBy(x => x.CriteriaId)
-            .Select(g => new CriteriaJobsGroup
-            {
-                CriteriaId = g.Key,
-                CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
-                    ? name
-                    : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
-                Jobs = g.Select(x => x.Job!)
-                    .OrderByDescending(j => ParsePostedDate(j.DatePosted))
-                    .ToList(),
-            })
             .ToList();
+
+        var groups = await Task.WhenAll(grouped.Select(async g => new CriteriaJobsGroup
+        {
+            CriteriaId = g.Key,
+            CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
+                ? name
+                : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
+            Keywords = await _criteriaKeywordsStorage.GetKeywordsAsync(customerId, g.Key),
+            Jobs = g.Select(x => x.Job!)
+                .OrderByDescending(j => ParsePostedDate(j.DatePosted))
+                .ToList(),
+        }));
 
         return Ok(groups);
     }
