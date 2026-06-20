@@ -30,4 +30,18 @@ public class CriteriaTableStorage : ICriteriaStorage
         Id = entity.RowKey,
         Name = entity.GetString("CriteriaName") ?? string.Empty,
     };
+
+    public async Task CreateAsync(string customerId, string criteriaId, string name)
+    {
+        var entity = new TableEntity(customerId, criteriaId)
+        {
+            ["CriteriaName"] = name,
+        };
+        await GetTable().AddEntityAsync(entity);
+    }
+
+    public async Task DeleteAsync(string customerId, string criteriaId)
+    {
+        await GetTable().DeleteEntityAsync(customerId, criteriaId);
+    }
 }

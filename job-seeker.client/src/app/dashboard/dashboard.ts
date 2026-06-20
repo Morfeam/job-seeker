@@ -73,7 +73,7 @@ export class Dashboard implements OnInit {
       },
     });
 
-    this.http.get<CriteriaResponse>('/job-seeker/criteria', { headers }).subscribe({
+    this.http.get<CriteriaResponse>('/job-seeker/slim-criteria', { headers }).subscribe({
       next: (r) => {
         this.criteria = r.criteria ?? [];
       },

@@ -9,6 +9,11 @@ using Resend;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Gitignored, local-only overrides (e.g. real AZURE_SUBSCRIPTION_ID/AZURE_RESOURCE_GROUP
+// for testing the scrape trigger against a real Container App Job from a dev machine).
+// Not loaded automatically by ASP.NET Core — must be wired up explicitly.
+builder.Configuration.AddJsonFile("local.settings.json", optional: true, reloadOnChange: true);
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -68,7 +73,7 @@ builder.Services.AddTransient<IResend, ResendClient>();
 builder.Services.AddSingleton<TokenHandler>();
 builder.Services.AddSingleton<ICustomerStorage, CustomerTableStorage>();
 builder.Services.AddSingleton<ICriteriaStorage, CriteriaTableStorage>();
-builder.Services.AddSingleton<ICriteriaKeywordsStorage, CriteriaKeywordsBlobStorage>();
+builder.Services.AddSingleton<ICriteriaBlobStorage, CriteriaBlobStorage>();
 builder.Services.AddSingleton<IJobLinkStorage, JobLinkTableStorage>();
 builder.Services.AddSingleton<IJobResultStorage, JobResultBlobStorage>();
 builder.Services.AddSingleton(new ArmClient(credential));

@@ -1,7 +1,10 @@
 <!-- Banner (compact hero, matches About page) -->
 <section class="py-4 bg-primary text-white text-center">
   <div class="container py-2 d-flex flex-wrap align-items-center justify-content-center gap-3">
-    <h1 class="display-5 fw-bold mb-0">My Jobs</h1>
+    <div>
+      <h1 class="display-5 fw-bold mb-0">My Jobs</h1>
+      <p class="mb-0">Jobs found for you based on search criteria!</p>
+    </div>
     @if (!loading) {
       <select class="form-select w-auto" (change)="onFilter($any($event.target).value)">
         <option value="all">All criteria</option>
