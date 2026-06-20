@@ -244,3 +244,29 @@ Returns the user's most recent jobs (cap **100**), grouped by criteria.
 3. "Load more jobs" appears only when >10 jobs match; reveals 10 more each click up to 100.
 4. Each card: board icon, title links out, AI insights populated when enrichment ran, summary expands/collapses, posted date shown.
 5. Force a backend failure (e.g. stop the API) → page routes to `/error`.
+
+---
+
+## Addendum B: Tech-skill highlighting from criteria keywords/technology
+
+### Context
+Job cards highlight `technologies` blue when they match terms the customer cares about, grey otherwise. The matching terms come from the same `criteria/{customerId}/{criteriaId}.json` blob the scraper reads — not from a separate API.
+
+### `criteria.json` schema addition
+```json
+{
+  "keywords": ["Software Engineer", "C#", "Python", "Azure"],
+  "technology": ["React", "GraphQL"],
+  "location": "New York, New York"
+}
+```
+- `keywords` — already consumed by the Python scraper as search terms (unchanged).
+- `technology` — **new**, addendum-only list of extra terms used purely for job-card highlighting. The scraper never reads this field; only the .NET backend does.
+
+### Backend
+- `ICriteriaKeywordsStorage` / `CriteriaKeywordsBlobStorage` downloads the criteria blob and reads both the `keywords` and `technology` arrays, merging them into one case-insensitive, deduped list.
+- `CriteriaJobsGroup.Keywords` carries that merged list back to the frontend per criteria group (`JobSeekerController.GetJobs`).
+- Missing blob (404) or missing field → empty list, so highlighting just falls back to all-grey rather than erroring.
+
+### Frontend
+- `UserJobs` matches each `JobTechnology.name` against the merged list (case-insensitive, substring-tolerant in either direction) to set a `matched` flag, sorts matched-first, and renders `matched` as `bg-primary` (blue) vs grey (`bg-secondary`).

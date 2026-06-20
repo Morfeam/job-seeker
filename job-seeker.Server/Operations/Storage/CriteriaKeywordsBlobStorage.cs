@@ -4,8 +4,10 @@ using Azure.Storage.Blobs;
 
 namespace job_seeker.Server.Operations.Storage;
 
-// Reads the "keywords" array out of the same criteria.json blob the Python
-// scraper uses (container "criteria", blob "{customerId}/{criteriaId}.json").
+// Reads the "keywords" and "technology" arrays out of the same criteria.json blob
+// the Python scraper uses (container "criteria", blob "{customerId}/{criteriaId}.json").
+// "technology" is an addendum list used only for tech-skill highlighting on job cards —
+// the scraper itself only ever reads "keywords".
 public class CriteriaKeywordsBlobStorage : ICriteriaKeywordsStorage
 {
     private const string ContainerName = "criteria";
@@ -29,18 +31,26 @@ public class CriteriaKeywordsBlobStorage : ICriteriaKeywordsStorage
         {
             var response = await blobClient.DownloadContentAsync();
             using var doc = JsonDocument.Parse(response.Value.Content.ToStream());
-            if (!doc.RootElement.TryGetProperty("keywords", out var keywords) || keywords.ValueKind != JsonValueKind.Array)
-                return [];
 
-            return keywords.EnumerateArray()
-                .Select(k => k.GetString())
-                .Where(k => !string.IsNullOrWhiteSpace(k))
-                .Select(k => k!)
+            return ReadStringArray(doc.RootElement, "keywords")
+                .Concat(ReadStringArray(doc.RootElement, "technology"))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
             return [];
         }
+    }
+
+    private static IEnumerable<string> ReadStringArray(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var array) || array.ValueKind != JsonValueKind.Array)
+            return [];
+
+        return array.EnumerateArray()
+            .Select(v => v.GetString())
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!);
     }
 }
