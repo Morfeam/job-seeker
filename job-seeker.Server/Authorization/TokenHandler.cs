@@ -21,7 +21,8 @@ public class TokenHandler
         return GenerateToken(
             subject: customerId,
             expiry: DateTime.UtcNow.AddMinutes(expiryMinutes),
-            extraClaims: null);
+            extraClaims: null,
+            signingKey: GetAccessTokenSigningKey());
     }
 
     public string CreatePasswordResetToken(string customerId)
@@ -30,13 +31,14 @@ public class TokenHandler
         return GenerateToken(
             subject: customerId,
             expiry: DateTime.UtcNow.AddMinutes(expiryMinutes),
-            extraClaims: new Dictionary<string, object> { ["purpose"] = PasswordResetPurpose });
+            extraClaims: new Dictionary<string, object> { ["purpose"] = PasswordResetPurpose },
+            signingKey: GetResetTokenSigningKey());
     }
 
     public async Task<string?> ValidatePasswordResetTokenAsync(string token)
     {
         var handler = new JsonWebTokenHandler();
-        var result = await handler.ValidateTokenAsync(token, GetValidationParameters());
+        var result = await handler.ValidateTokenAsync(token, GetResetTokenValidationParameters());
         if (!result.IsValid) return null;
 
         var jwt = result.SecurityToken as JsonWebToken;
@@ -48,18 +50,21 @@ public class TokenHandler
         return jwt.Subject;
     }
 
-    public TokenValidationParameters GetValidationParameters()
+    // Used only to validate password-reset tokens (TokenHandler.ValidatePasswordResetTokenAsync above);
+    // access tokens are validated separately by the JwtBearer middleware in Program.cs.
+    // Reset tokens are signed with a different secret (jwt-reset-secret) than access tokens
+    // (jwt-secret) so that a leak of one secret can't be used to forge the other token type —
+    // password-reset tokens directly change a customer's password, a more severe blast radius
+    // than impersonating a session.
+    private TokenValidationParameters GetResetTokenValidationParameters() => new()
     {
-        return new TokenValidationParameters
-        {
-            IssuerSigningKey = GetSigningKey(),
-            ValidIssuer = _config["jwt-issuer"],
-            ValidAudience = _config["jwt-audience"],
-            ClockSkew = TimeSpan.Zero
-        };
-    }
+        IssuerSigningKey = GetResetTokenSigningKey(),
+        ValidIssuer = _config["jwt-issuer"],
+        ValidAudience = _config["jwt-audience"],
+        ClockSkew = TimeSpan.Zero,
+    };
 
-    private string GenerateToken(string subject, DateTime expiry, Dictionary<string, object>? extraClaims)
+    private string GenerateToken(string subject, DateTime expiry, Dictionary<string, object>? extraClaims, SymmetricSecurityKey signingKey)
     {
         var descriptor = new SecurityTokenDescriptor
         {
@@ -67,13 +72,19 @@ public class TokenHandler
             Expires = expiry,
             Issuer = _config["jwt-issuer"],
             Audience = _config["jwt-audience"],
-            SigningCredentials = new SigningCredentials(GetSigningKey(), SecurityAlgorithms.HmacSha256),
+            SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256),
             Claims = extraClaims
         };
 
         return new JsonWebTokenHandler().CreateToken(descriptor);
     }
 
-    private SymmetricSecurityKey GetSigningKey() =>
-        new(Encoding.UTF8.GetBytes(_config["jwt-secret"]!));
+    private SymmetricSecurityKey GetAccessTokenSigningKey() =>
+        new(Encoding.UTF8.GetBytes(RequireConfig("jwt-secret")));
+
+    private SymmetricSecurityKey GetResetTokenSigningKey() =>
+        new(Encoding.UTF8.GetBytes(RequireConfig("jwt-reset-secret")));
+
+    private string RequireConfig(string key) =>
+        _config[key] ?? throw new InvalidOperationException($"Missing required configuration value '{key}'.");
 }
