@@ -1,0 +1,103 @@
+<!-- Banner (compact hero, matches Criteria/My Jobs page) -->
+<section class="py-4 bg-primary text-white text-center">
+  <div class="container py-2">
+    <h1 class="display-5 fw-bold mb-0">My Resumes</h1>
+    <p class="mb-0">A place to preview and download resumes you've added as well as upload new ones!</p>
+  </div>
+</section>
+
+@if (loading) {
+  <div class="container py-5 text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading…</span>
+    </div>
+  </div>
+} @else {
+  <div class="container py-5">
+
+    @if (errorMessage) {
+      <div class="alert alert-danger">{{ errorMessage }}</div>
+    }
+
+    <!-- Upload form -->
+    <div class="row justify-content-center mb-4">
+      <div class="col-12 col-lg-9">
+        <div class="card shadow-sm border rounded-4">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3">Upload Resume</h5>
+            <form [formGroup]="form" (ngSubmit)="onSubmit()">
+              <div class="row g-3">
+                <div class="col-12 col-lg-6">
+                  <label class="form-label">Name <span class="text-muted small">(optional)</span></label>
+                  <input type="text" class="form-control" formControlName="name" maxlength="100" />
+                  <div class="form-text">Falls back to the file name if left blank.</div>
+                </div>
+                <div class="col-12 col-lg-6">
+                  <label class="form-label">Associated Criteria <span class="text-muted small">(optional)</span></label>
+                  <select class="form-select" formControlName="associatedCriteriaId">
+                    <option value="">None</option>
+                    @for (c of criteriaList; track c.id) {
+                      <option [value]="c.id">{{ c.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">File</label>
+                  <input
+                    #fileInput
+                    type="file"
+                    class="form-control"
+                    accept=".pdf,.md,.txt,.html,.docx"
+                    (change)="onFileSelected($event)"
+                  />
+                  <div class="form-text">PDF, Markdown, plain text, HTML, or Word (.docx). Max 5 MB.</div>
+                  @if (fileTooLarge) {
+                    <small class="text-danger">File exceeds the 5 MB size limit.</small>
+                  }
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary mt-3" [disabled]="!selectedFile || fileTooLarge || submitting">
+                @if (submitting) {
+                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                }
+                Upload Resume
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resume cards -->
+    @if (resumeList.length === 0) {
+      <p class="text-muted text-center">No resumes yet. Upload one above.</p>
+    }
+    <div class="row g-4">
+      @for (r of resumeList; track r.id) {
+        <div class="col-12 col-lg-3">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <h5 class="fw-bold mb-1">{{ r.name }}</h5>
+                <button type="button" class="btn btn-sm btn-outline-danger" (click)="onDelete(r.id)">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+              <p class="text-muted mb-1 small">{{ r.fileName }}</p>
+              @if (r.uploadDate) {
+                <p class="text-muted mb-2 small">{{ r.uploadDate | date: 'medium' }}</p>
+              }
+              <span class="badge bg-secondary mb-2">{{ resolveCriteriaName(r.associatedCriteriaId) }}</span>
+              <div>
+                <a [href]="r.downloadUrl" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
+                  <i class="bi bi-download me-1"></i>Download
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}

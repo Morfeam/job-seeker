@@ -1,9 +1,11 @@
+using System.Threading.RateLimiting;
 using Azure.Identity;
 using Azure.ResourceManager;
 using job_seeker.Server.Authorization;
 using job_seeker.Server.Operations.Email;
 using job_seeker.Server.Operations.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Azure;
 using Resend;
 
@@ -55,12 +57,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         o.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
             IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
-                System.Text.Encoding.UTF8.GetBytes(builder.Configuration["jwt-secret"] ?? "dev-secret-change-me")),
+                System.Text.Encoding.UTF8.GetBytes(builder.Configuration["jwt-secret"]
+                    ?? throw new InvalidOperationException("Missing required configuration value 'jwt-secret'."))),
             ValidIssuer = builder.Configuration["jwt-issuer"],
             ValidAudience = builder.Configuration["jwt-audience"],
             ClockSkew = TimeSpan.Zero,
         };
     });
+
+// Global default: 100 requests/minute per client IP, applied to every endpoint.
+// WARNING: partitions on httpContext.Connection.RemoteIpAddress, the direct TCP peer.
+// If this app ends up behind a reverse proxy/CDN that doesn't forward the real client IP,
+// this will see only the proxy's IP and the limit will apply collectively to all traffic
+// instead of per real client. If that happens, switch to reading X-Forwarded-For via the
+// ForwardedHeaders middleware (configured for the known proxy) instead of RemoteIpAddress.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+});
 
 builder.Services.AddOptions();
 builder.Services.AddHttpClient<ResendClient>();
@@ -76,6 +98,8 @@ builder.Services.AddSingleton<ICriteriaStorage, CriteriaTableStorage>();
 builder.Services.AddSingleton<ICriteriaBlobStorage, CriteriaBlobStorage>();
 builder.Services.AddSingleton<IJobLinkStorage, JobLinkTableStorage>();
 builder.Services.AddSingleton<IJobResultStorage, JobResultBlobStorage>();
+builder.Services.AddSingleton<IResumeStorage, ResumeTableStorage>();
+builder.Services.AddSingleton<IResumeBlobStorage, ResumeBlobStorage>();
 builder.Services.AddSingleton(new ArmClient(credential));
 builder.Services.AddScoped<ISendEmail, SendEmail>();
 
@@ -95,6 +119,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
