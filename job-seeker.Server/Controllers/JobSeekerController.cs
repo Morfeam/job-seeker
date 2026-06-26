@@ -20,7 +20,7 @@ public class JobSeekerController : ControllerBase
     private const int MaxJobs = 100;
 
     private readonly ICriteriaStorage _criteriaStorage;
-    private readonly ICriteriaKeywordsStorage _criteriaKeywordsStorage;
+    private readonly ICriteriaBlobStorage _criteriaBlobStorage;
     private readonly IJobLinkStorage _jobLinkStorage;
     private readonly IJobResultStorage _jobResultStorage;
     private readonly ArmClient _armClient;
@@ -28,14 +28,14 @@ public class JobSeekerController : ControllerBase
 
     public JobSeekerController(
         ICriteriaStorage criteriaStorage,
-        ICriteriaKeywordsStorage criteriaKeywordsStorage,
+        ICriteriaBlobStorage criteriaBlobStorage,
         IJobLinkStorage jobLinkStorage,
         IJobResultStorage jobResultStorage,
         ArmClient armClient,
         IConfiguration config)
     {
         _criteriaStorage = criteriaStorage;
-        _criteriaKeywordsStorage = criteriaKeywordsStorage;
+        _criteriaBlobStorage = criteriaBlobStorage;
         _jobLinkStorage = jobLinkStorage;
         _jobResultStorage = jobResultStorage;
         _armClient = armClient;
@@ -47,8 +47,8 @@ public class JobSeekerController : ControllerBase
         ?? User.FindFirst("sub")?.Value;
 
     [Authorize]
-    [HttpGet("criteria")]
-    public async Task<IActionResult> GetCriteria()
+    [HttpGet("slim-criteria")]
+    public async Task<IActionResult> GetSlimCriteria()
     {
         var customerId = GetCustomerId();
         if (string.IsNullOrEmpty(customerId))
@@ -95,7 +95,7 @@ public class JobSeekerController : ControllerBase
             CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
                 ? name
                 : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
-            Keywords = await _criteriaKeywordsStorage.GetKeywordsAsync(customerId, g.Key),
+            Keywords = await GetCombinedKeywordsAsync(customerId, g.Key),
             Jobs = g.Select(x => x.Job!)
                 .OrderByDescending(j => ParsePostedDate(j.DatePosted))
                 .ToList(),
@@ -184,6 +184,21 @@ public class JobSeekerController : ControllerBase
     ];
 
     private static string Bool(bool value) => value ? "true" : "false";
+
+    // Union of a criteria's keywords + technology, used to highlight matching
+    // tech-skill badges on the My Jobs page.
+    private async Task<List<string>> GetCombinedKeywordsAsync(string customerId, string criteriaId)
+    {
+        var detail = await _criteriaBlobStorage.GetAsync(customerId, criteriaId);
+        if (detail == null)
+            return [];
+
+        return detail.Keywords
+            .Concat(detail.Technology)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
     // Jobs without a parseable date_posted sort last (oldest).
     private static DateTimeOffset ParsePostedDate(string? value) =>

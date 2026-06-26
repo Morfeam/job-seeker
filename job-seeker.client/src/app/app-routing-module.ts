@@ -10,6 +10,7 @@ import { ResetPassword } from './reset-password/reset-password';
 import { Dashboard } from './dashboard/dashboard';
 import { UserJobs } from './user-jobs/user-jobs';
 import { ErrorPage } from './error/error';
+import { Criteria } from './criteria/criteria';
 
 const routes: Routes = [
   { path: '', component: Home },
@@ -20,6 +21,7 @@ const routes: Routes = [
   { path: 'reset-password/:id', component: ResetPassword },
   { path: 'dashboard', component: Dashboard },
   { path: 'my-jobs', component: UserJobs },
+  { path: 'criteria', component: Criteria },
   { path: 'error', component: ErrorPage },
   { path: '**', redirectTo: '' },
 ];

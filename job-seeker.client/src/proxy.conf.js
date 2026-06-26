@@ -8,6 +8,11 @@ const PROXY_CONFIG = [
     context: ['/job-seeker'],
     target: 'https://localhost:7107',
     secure: false
+  },
+  {
+    context: ['/criteria'],
+    target: 'https://localhost:7107',
+    secure: false
   }
 ];
 

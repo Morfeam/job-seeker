@@ -264,9 +264,15 @@ Job cards highlight `technologies` blue when they match terms the customer cares
 - `technology` — **new**, addendum-only list of extra terms used purely for job-card highlighting. The scraper never reads this field; only the .NET backend does.
 
 ### Backend
-- `ICriteriaKeywordsStorage` / `CriteriaKeywordsBlobStorage` downloads the criteria blob and reads both the `keywords` and `technology` arrays, merging them into one case-insensitive, deduped list.
-- `CriteriaJobsGroup.Keywords` carries that merged list back to the frontend per criteria group (`JobSeekerController.GetJobs`).
+- `ICriteriaBlobStorage` / `CriteriaBlobStorage` (see [criteria-integration.md](./criteria-integration.md) — this is the same full criteria-blob reader/writer added for the Criteria CRUD feature) downloads the criteria blob and `JobSeekerController.GetJobs`'s private `GetCombinedKeywordsAsync` helper unions the `Keywords` and `Technology` fields into one case-insensitive, deduped list.
+- `CriteriaJobsGroup.Keywords` carries that merged list back to the frontend per criteria group.
 - Missing blob (404) or missing field → empty list, so highlighting just falls back to all-grey rather than erroring.
 
 ### Frontend
 - `UserJobs` matches each `JobTechnology.name` against the merged list (case-insensitive, substring-tolerant in either direction) to set a `matched` flag, sorts matched-first, and renders `matched` as `bg-primary` (blue) vs grey (`bg-secondary`).
+
+---
+
+## Addendum C: `GET /job-seeker/criteria` renamed to `GET /job-seeker/slim-criteria`
+
+As part of the Criteria CRUD feature (see [criteria-integration.md](./criteria-integration.md)), the original `GET /job-seeker/criteria` endpoint described in section 2d above was renamed to `GET /job-seeker/slim-criteria` (`JobSeekerController.GetCriteria` → `GetSlimCriteria`) to make room for a richer `GET /criteria/get-criteria` endpoint on the new `CriteriaController`. The response shape (`{id, name}` pairs) and its use by the Dashboard's scrape-form dropdown are otherwise unchanged — only the route and method name changed.

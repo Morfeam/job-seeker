@@ -15,6 +15,8 @@ import { ResetPassword } from './reset-password/reset-password';
 import { Dashboard } from './dashboard/dashboard';
 import { UserJobs } from './user-jobs/user-jobs';
 import { ErrorPage } from './error/error';
+import { Criteria } from './criteria/criteria';
+import { ChipInput } from './chip-input/chip-input';
 
 @NgModule({
   declarations: [
@@ -29,6 +31,8 @@ import { ErrorPage } from './error/error';
     Dashboard,
     UserJobs,
     ErrorPage,
+    Criteria,
+    ChipInput,
   ],
   imports: [
     BrowserModule,
