@@ -83,9 +83,9 @@ resource jobSearchResultsContainer 'Microsoft.Storage/storageAccounts/blobServic
   }
 }
 
-resource resumeContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
+resource resumesContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
   parent: blobService
-  name: 'resume'
+  name: 'resumes'
   properties: {
     publicAccess: 'None'
   }
@@ -127,6 +127,11 @@ resource customerCriteriaTable 'Microsoft.Storage/storageAccounts/tableServices/
   name: 'CustomerCriteria'
 }
 
+resource resumesTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'Resumes'
+}
+
 // Storage Table Data Contributor — allows the managed identity to read/write table rows
 var storageTableDataContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 resource tableRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -148,6 +153,22 @@ resource blobRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01'
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDataContributorRoleId)
+    principalId: managedIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Storage Blob Delegator — grants permission to generate a user-delegation key,
+// required for BlobServiceClient.GetUserDelegationKeyAsync when the client is
+// authenticated via managed identity (no account key) — needed for the
+// time-limited resume-download SAS links. Storage Blob Data Contributor alone
+// does not include the generateUserDelegationKey action.
+var storageBlobDelegatorRoleId = 'db58b8e5-c6ad-4a2a-8342-4190687cbf4a'
+resource blobDelegatorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storageAccount.id, managedIdentity.id, storageBlobDelegatorRoleId)
+  scope: storageAccount
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', storageBlobDelegatorRoleId)
     principalId: managedIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }

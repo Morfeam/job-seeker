@@ -76,6 +76,8 @@ builder.Services.AddSingleton<ICriteriaStorage, CriteriaTableStorage>();
 builder.Services.AddSingleton<ICriteriaBlobStorage, CriteriaBlobStorage>();
 builder.Services.AddSingleton<IJobLinkStorage, JobLinkTableStorage>();
 builder.Services.AddSingleton<IJobResultStorage, JobResultBlobStorage>();
+builder.Services.AddSingleton<IResumeStorage, ResumeTableStorage>();
+builder.Services.AddSingleton<IResumeBlobStorage, ResumeBlobStorage>();
 builder.Services.AddSingleton(new ArmClient(credential));
 builder.Services.AddScoped<ISendEmail, SendEmail>();
 

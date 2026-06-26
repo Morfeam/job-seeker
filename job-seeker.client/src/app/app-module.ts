@@ -17,6 +17,7 @@ import { UserJobs } from './user-jobs/user-jobs';
 import { ErrorPage } from './error/error';
 import { Criteria } from './criteria/criteria';
 import { ChipInput } from './chip-input/chip-input';
+import { Resume } from './resume/resume';
 
 @NgModule({
   declarations: [
@@ -33,6 +34,7 @@ import { ChipInput } from './chip-input/chip-input';
     ErrorPage,
     Criteria,
     ChipInput,
+    Resume,
   ],
   imports: [
     BrowserModule,

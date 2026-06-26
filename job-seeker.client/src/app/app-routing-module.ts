@@ -11,6 +11,7 @@ import { Dashboard } from './dashboard/dashboard';
 import { UserJobs } from './user-jobs/user-jobs';
 import { ErrorPage } from './error/error';
 import { Criteria } from './criteria/criteria';
+import { Resume } from './resume/resume';
 
 const routes: Routes = [
   { path: '', component: Home },
@@ -22,6 +23,7 @@ const routes: Routes = [
   { path: 'dashboard', component: Dashboard },
   { path: 'my-jobs', component: UserJobs },
   { path: 'criteria', component: Criteria },
+  { path: 'resume', component: Resume },
   { path: 'error', component: ErrorPage },
   { path: '**', redirectTo: '' },
 ];
