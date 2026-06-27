@@ -18,6 +18,11 @@ const PROXY_CONFIG = [
     context: ['/resume'],
     target: 'https://localhost:7107',
     secure: false
+  },
+  {
+    context: ['/cv'],
+    target: 'https://localhost:7107',
+    secure: false
   }
 ];
 

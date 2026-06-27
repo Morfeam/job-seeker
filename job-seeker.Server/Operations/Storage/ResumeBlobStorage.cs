@@ -84,6 +84,20 @@ public class ResumeBlobStorage : IResumeBlobStorage
         return uriBuilder.ToUri();
     }
 
+    public async Task<(byte[] Content, string? ContentType)?> DownloadAsync(string customerId, string fileName)
+    {
+        var blobClient = GetBlobClient(customerId, fileName);
+        try
+        {
+            var response = await blobClient.DownloadContentAsync();
+            return (response.Value.Content.ToArray(), response.Value.Details.ContentType);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
+    }
+
     private BlobClient GetBlobClient(string customerId, string fileName) =>
         _blobService.GetBlobContainerClient(ContainerName).GetBlobClient($"{customerId}/{fileName}");
 }

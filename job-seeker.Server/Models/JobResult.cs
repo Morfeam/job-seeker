@@ -26,4 +26,9 @@ public class JobResult
     public string? CreatedDt { get; set; }
     public string? LastUpdatedDt { get; set; }
     public string? FormattedUpdatedDt { get; set; }
+
+    // Not part of the scraper's JSON blob — set in code from the JobLinks row after
+    // deserialization, so callers (e.g. cover-letter generation) can reference the
+    // blob this job came from.
+    public string? BlobFileName { get; set; }
 }
