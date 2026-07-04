@@ -91,9 +91,9 @@ resource resumesContainer 'Microsoft.Storage/storageAccounts/blobServices/contai
   }
 }
 
-resource coverLetterContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
+resource coverLettersContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-01-01' = {
   parent: blobService
-  name: 'cover-letter'
+  name: 'cover-letters'
   properties: {
     publicAccess: 'None'
   }
@@ -130,6 +130,11 @@ resource customerCriteriaTable 'Microsoft.Storage/storageAccounts/tableServices/
 resource resumesTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
   parent: tableService
   name: 'Resumes'
+}
+
+resource coverLettersTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'CoverLetters'
 }
 
 // Storage Table Data Contributor — allows the managed identity to read/write table rows

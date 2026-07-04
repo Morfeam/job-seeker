@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using Azure.Identity;
 using Azure.ResourceManager;
 using job_seeker.Server.Authorization;
+using job_seeker.Server.Operations.Ai;
 using job_seeker.Server.Operations.Email;
 using job_seeker.Server.Operations.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -92,6 +93,9 @@ builder.Services.Configure<ResendClientOptions>(o =>
 });
 builder.Services.AddTransient<IResend, ResendClient>();
 
+builder.Services.AddHttpClient<AnthropicClient>();
+builder.Services.AddTransient<IAnthropicClient, AnthropicClient>();
+
 builder.Services.AddSingleton<TokenHandler>();
 builder.Services.AddSingleton<ICustomerStorage, CustomerTableStorage>();
 builder.Services.AddSingleton<ICriteriaStorage, CriteriaTableStorage>();
@@ -100,6 +104,8 @@ builder.Services.AddSingleton<IJobLinkStorage, JobLinkTableStorage>();
 builder.Services.AddSingleton<IJobResultStorage, JobResultBlobStorage>();
 builder.Services.AddSingleton<IResumeStorage, ResumeTableStorage>();
 builder.Services.AddSingleton<IResumeBlobStorage, ResumeBlobStorage>();
+builder.Services.AddSingleton<ICoverLetterStorage, CoverLetterTableStorage>();
+builder.Services.AddSingleton<ICoverLetterBlobStorage, CoverLetterBlobStorage>();
 builder.Services.AddSingleton(new ArmClient(credential));
 builder.Services.AddScoped<ISendEmail, SendEmail>();
 

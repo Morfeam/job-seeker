@@ -18,6 +18,7 @@ import { ErrorPage } from './error/error';
 import { Criteria } from './criteria/criteria';
 import { ChipInput } from './chip-input/chip-input';
 import { Resume } from './resume/resume';
+import { CoverLetterGenerator } from './cover-letter-generator/cover-letter-generator';
 
 @NgModule({
   declarations: [
@@ -35,6 +36,7 @@ import { Resume } from './resume/resume';
     Criteria,
     ChipInput,
     Resume,
+    CoverLetterGenerator,
   ],
   imports: [
     BrowserModule,

@@ -76,7 +76,12 @@ public class JobSeekerController : ControllerBase
 
         // Read each job's blob in parallel, preserving its criteria association.
         var loaded = await Task.WhenAll(links.Select(async link =>
-            (link.CriteriaId, Job: await _jobResultStorage.GetJobAsync(customerId, link.BlobFileName))));
+        {
+            var job = await _jobResultStorage.GetJobAsync(customerId, link.BlobFileName);
+            if (job != null)
+                job.BlobFileName = link.BlobFileName;
+            return (link.CriteriaId, Job: job);
+        }));
 
         // Resolve criteria id -> display name.
         var criteria = await _criteriaStorage.GetByCustomerIdAsync(customerId);

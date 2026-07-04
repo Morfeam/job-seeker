@@ -1,0 +1,128 @@
+@if (loading) {
+  <div class="container py-5 text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading…</span>
+    </div>
+  </div>
+} @else {
+  <div class="container py-4">
+
+    @if (errorMessage) {
+      <div class="alert alert-danger">{{ errorMessage }}</div>
+    }
+
+    <!-- Generate form -->
+    <div class="row justify-content-center mb-4">
+      <div class="col-12 col-lg-9">
+        <div class="card shadow-sm border rounded-4">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3">Generate a Cover Letter</h5>
+            <form [formGroup]="form" (ngSubmit)="onGenerate()">
+              <div class="row g-3">
+                <div class="col-12 col-lg-6">
+                  <label class="form-label">Job</label>
+                  <select class="form-select" formControlName="jobBlobFileName">
+                    <option value="" disabled>
+                      {{ jobs.length ? 'Select a job…' : 'No scraped jobs found' }}
+                    </option>
+                    @for (j of jobs; track j.blobFileName) {
+                      <option [value]="j.blobFileName">{{ j.title }} — {{ j.company }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-12 col-lg-6">
+                  <label class="form-label">Resume</label>
+                  <select class="form-select" formControlName="resumeId">
+                    <option value="" disabled>
+                      {{ resumes.length ? 'Select a resume…' : 'No resumes found' }}
+                    </option>
+                    @for (r of resumes; track r.id) {
+                      <option [value]="r.id">{{ r.name }}</option>
+                    }
+                  </select>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label d-block">Style</label>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" formControlName="cvEnrichmentStyle" value="None" id="styleNone" />
+                    <label class="form-check-label" for="styleNone">None — write from scratch</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      formControlName="cvEnrichmentStyle"
+                      value="Prime"
+                      id="stylePrime"
+                      [disabled]="!hasCoverLetters"
+                    />
+                    <label class="form-check-label" for="stylePrime">Prime — match my Prime cover letter</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      formControlName="cvEnrichmentStyle"
+                      value="All"
+                      id="styleAll"
+                      [disabled]="!hasCoverLetters"
+                    />
+                    <label class="form-check-label" for="styleAll">All — match my other cover letters</label>
+                  </div>
+                  @if (!hasCoverLetters) {
+                    <div class="form-text">Generate at least one cover letter to unlock the Prime/All styles.</div>
+                  }
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary mt-3" [disabled]="form.invalid || submitting">
+                @if (submitting) {
+                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                }
+                Generate Cover Letter
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent cover letters -->
+    @if (coverLetters.length === 0) {
+      <p class="text-muted text-center">No cover letters yet. Generate one above.</p>
+    }
+    <div class="row g-4">
+      @for (cl of coverLetters; track cl.coverLetterId) {
+        <div class="col-12 col-lg-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <h5 class="fw-bold mb-1">{{ cl.coverLetterName }}</h5>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  [class.btn-warning]="cl.isPrime"
+                  [class.btn-outline-secondary]="!cl.isPrime"
+                  title="Set as Prime"
+                  (click)="onSetPrime(cl.coverLetterId)"
+                >
+                  <i class="bi" [class.bi-star-fill]="cl.isPrime" [class.bi-star]="!cl.isPrime"></i>
+                </button>
+              </div>
+              <p class="text-muted mb-1 small">For resume: {{ cl.relatedResumeName }}</p>
+              @if (cl.createdDate) {
+                <p class="text-muted mb-2 small">{{ cl.createdDate | date: 'medium' }}</p>
+              }
+              <div>
+                <a [href]="cl.blobDownloadURL" target="_blank" rel="noopener" class="btn btn-sm btn-primary">
+                  <i class="bi bi-download me-1"></i>Download
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
