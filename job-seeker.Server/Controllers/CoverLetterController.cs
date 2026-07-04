@@ -165,6 +165,52 @@ public class CoverLetterController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("latest-for-job")]
+    public async Task<IActionResult> GetLatestForJob([FromQuery] string jobId)
+    {
+        if (string.IsNullOrWhiteSpace(jobId))
+            return BadRequest(new { error = "jobId is required." });
+
+        var customerId = GetCustomerId();
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+
+        var row = await _coverLetterStorage.GetLatestForJobAsync(customerId, jobId);
+        if (row == null)
+            return NotFound();
+
+        var resume = await _resumeStorage.GetByIdAsync(customerId, row.ResumeId);
+        var url = await _coverLetterBlobStorage.GenerateDownloadUrlAsync(customerId, row.Id, DownloadLinkValidFor);
+        if (url == null)
+            return NotFound();
+
+        return Ok(CoverLetterResponseItem.From(row, resume?.Name ?? string.Empty, url.ToString()));
+    }
+
+    [Authorize]
+    [HttpGet("cover-letter-text/{coverLetterId}")]
+    public async Task<IActionResult> GetCoverLetterText(string coverLetterId)
+    {
+        if (string.IsNullOrWhiteSpace(coverLetterId))
+            return BadRequest(new { error = "coverLetterId is required." });
+
+        var customerId = GetCustomerId();
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+
+        // Confirm ownership before serving the content.
+        var row = await _coverLetterStorage.GetByIdAsync(customerId, coverLetterId);
+        if (row == null)
+            return NotFound();
+
+        var text = await _coverLetterBlobStorage.DownloadTextAsync(customerId, coverLetterId);
+        if (text == null)
+            return NotFound();
+
+        return Ok(new { text });
+    }
+
+    [Authorize]
     [HttpPost("set-prime")]
     public async Task<IActionResult> SetPrime([FromBody] SetPrimeCoverLetterRequest request)
     {

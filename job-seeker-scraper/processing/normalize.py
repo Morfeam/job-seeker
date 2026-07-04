@@ -35,6 +35,7 @@ class NormalizedJob:
     created_dt: str | None
     last_updated_dt: str | None
     formatted_updated_dt: str | None
+    criteria_match_score: int = 0
 
 
 def _is_nan(value) -> bool:

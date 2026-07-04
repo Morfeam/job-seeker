@@ -1,20 +1,37 @@
 <!-- Banner (compact hero, matches About page) -->
 <section class="py-4 bg-primary text-white text-center">
-  <div class="container py-2 d-flex flex-wrap align-items-center justify-content-center gap-3">
-    <div>
-      <h1 class="display-5 fw-bold mb-0">My Jobs</h1>
-      <p class="mb-0">Jobs found for you based on search criteria!</p>
-    </div>
-    @if (!loading) {
-      <select class="form-select w-auto" (change)="onFilter($any($event.target).value)">
-        <option value="all">All criteria</option>
-        @for (c of criteriaOptions; track c.id) {
-          <option [value]="c.id">{{ c.name }}</option>
-        }
-      </select>
-    }
+  <div class="container py-2">
+    <h1 class="display-5 fw-bold mb-0">My Jobs</h1>
+    <p class="mb-0">Jobs found for you based on search criteria!</p>
   </div>
 </section>
+
+<!-- Filter & Sort bar -->
+@if (!loading) {
+  <section class="py-2 border-bottom bg-light">
+    <div class="container">
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <span class="fw-semibold small">Filter &amp; Sort</span>
+        <select class="form-select form-select-sm w-auto" (change)="onFilter($any($event.target).value)">
+          <option value="all">All criteria</option>
+          @for (c of criteriaOptions; track c.id) {
+            <option [value]="c.id">{{ c.name }}</option>
+          }
+        </select>
+        <div class="form-check mb-0">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="sortByScore"
+            [checked]="sortByScore"
+            (change)="onSortByScore($any($event.target).checked)"
+          />
+          <label class="form-check-label small" for="sortByScore">Sort by score</label>
+        </div>
+      </div>
+    </div>
+  </section>
+}
 
 @if (loading) {
   <div class="container py-5 text-center">
@@ -35,8 +52,8 @@
           <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
 
-              <!-- Header: board icon + title/company/location/salary -->
-              <div class="d-flex">
+              <!-- Header: board icon + title/company/location/salary + score -->
+              <div class="d-flex align-items-start">
                 <!-- Job board icon placeholder -->
                 <span class="d-inline-block bg-dark rounded me-3 flex-shrink-0" style="width: 2.5rem; height: 2.5rem;"
                       [title]="card.job.source ?? ''"></span>
@@ -56,6 +73,11 @@
                     </a>
                   }
                 </div>
+                @if (card.job.criteriaMatchScore != null) {
+                  <span class="fw-bold text-primary ms-2 flex-shrink-0" title="Criteria match score">
+                    {{ card.job.criteriaMatchScore }}
+                  </span>
+                }
               </div>
 
               <!-- AI-extracted requirements -->
@@ -127,12 +149,29 @@
                 </div>
               }
 
-              <!-- Footer: posted date -->
-              @if (card.job.datePosted) {
-                <div class="text-muted small mt-3">
-                  <i class="bi bi-calendar3 me-1"></i>Posted {{ card.job.datePosted | date: 'mediumDate' }}
-                </div>
-              }
+              <!-- Actions -->
+              <div class="d-flex gap-2 mt-3">
+                <a class="btn btn-sm btn-primary"
+                   [routerLink]="['/job-details']"
+                   [queryParams]="{ job: card.job.blobFileName }">
+                  <i class="bi bi-envelope me-1"></i>Generate Cover Letter
+                </a>
+                <a class="btn btn-sm btn-outline-secondary"
+                   [routerLink]="['/job-details']"
+                   [queryParams]="{ job: card.job.blobFileName }">
+                  <i class="bi bi-info-circle me-1"></i>More Details
+                </a>
+              </div>
+
+              <!-- Footer: posted date + criteria name -->
+              <div class="d-flex justify-content-between align-items-center text-muted small mt-3">
+                @if (card.job.datePosted) {
+                  <span><i class="bi bi-calendar3 me-1"></i>Posted {{ card.job.datePosted | date: 'mediumDate' }}</span>
+                } @else {
+                  <span></span>
+                }
+                <span>{{ card.criteriaName }}</span>
+              </div>
             </div>
           </div>
         </div>
