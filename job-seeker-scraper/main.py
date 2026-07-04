@@ -18,6 +18,34 @@ from notifications.email import send_results_email
 
 log = logging.getLogger(__name__)
 
+
+def _calculate_match_score(job, keywords: list[str], technology: list[str]) -> int:
+    """Score a job against the criteria that found it.
+
+    Each matched keyword scores 10 pts (checked against the job's AI-enriched
+    technology names first, then the job title + description as a fallback).
+    Each matched technology entry scores 5 pts (enriched technology names only).
+    Matching is case-insensitive substring in either direction.
+    """
+    tech_names = [t.name.lower() for t in (job.technologies or [])]
+    job_text = f"{job.title or ''} {job.description or ''}".lower()
+    score = 0
+
+    for kw in keywords:
+        kw_lower = kw.lower()
+        in_tech = any(kw_lower in t or t in kw_lower for t in tech_names)
+        in_text = kw_lower in job_text
+        if in_tech or in_text:
+            score += 10
+
+    for tech in technology:
+        tech_lower = tech.lower()
+        if any(tech_lower in t or t in tech_lower for t in tech_names):
+            score += 5
+
+    return score
+
+
 _LOG_LEVELS = {
     "debug": logging.INFO,
     "standard": logging.WARNING,
@@ -75,6 +103,7 @@ def main() -> None:
     log.info("Loading search criteria from Azure Blob Storage...")
     criteria = load_criteria(customer_id, args.criteria_id)
     keywords: list[str] = criteria["keywords"]
+    technology: list[str] = criteria.get("technology", [])
     location: str = criteria["location"]
     distance: int | None = criteria.get("distance")
     hours_old: int | None = criteria.get("hoursOld")
@@ -127,6 +156,10 @@ def main() -> None:
         client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         normalized = [enrich_job(job, client) for job in normalized]
         log.info("Enrichment complete")
+
+    log.info("Scoring jobs against criteria...")
+    for job in normalized:
+        job.criteria_match_score = _calculate_match_score(job, keywords, technology)
 
     if args.what_if:
         log.info("[WHAT-IF] Dry run — skipping Azure writes and email")

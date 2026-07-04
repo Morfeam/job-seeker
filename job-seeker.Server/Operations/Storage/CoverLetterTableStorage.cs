@@ -39,6 +39,15 @@ public class CoverLetterTableStorage : ICoverLetterStorage
         }
     }
 
+    public async Task<CoverLetter?> GetLatestForJobAsync(string customerId, string jobId)
+    {
+        var all = await GetByCustomerIdAsync(customerId);
+        return all
+            .Where(c => string.Equals(c.JobId, jobId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(c => c.CreatedDate ?? DateTimeOffset.MinValue)
+            .FirstOrDefault();
+    }
+
     public async Task<List<CoverLetter>> GetRecentByCustomerIdAsync(string customerId, int max)
     {
         // Table Storage can't order server-side, so pull the partition and sort by Timestamp.

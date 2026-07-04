@@ -19,6 +19,7 @@ import { Criteria } from './criteria/criteria';
 import { ChipInput } from './chip-input/chip-input';
 import { Resume } from './resume/resume';
 import { CoverLetterGenerator } from './cover-letter-generator/cover-letter-generator';
+import { JobDetails } from './job-details/job-details';
 
 @NgModule({
   declarations: [
@@ -37,6 +38,7 @@ import { CoverLetterGenerator } from './cover-letter-generator/cover-letter-gene
     ChipInput,
     Resume,
     CoverLetterGenerator,
+    JobDetails,
   ],
   imports: [
     BrowserModule,

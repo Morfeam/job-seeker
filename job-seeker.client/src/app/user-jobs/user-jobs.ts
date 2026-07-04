@@ -37,6 +37,8 @@ interface JobResult {
   createdDt: string | null;
   lastUpdatedDt: string | null;
   formattedUpdatedDt: string | null;
+  criteriaMatchScore: number | null;
+  blobFileName: string | null;
 }
 
 interface CriteriaJobsGroup {
@@ -49,6 +51,7 @@ interface CriteriaJobsGroup {
 interface JobCard {
   job: JobResult;
   technologies: DisplayTechnology[];
+  criteriaName: string;
 }
 
 const PAGE_SIZE = 10;
@@ -64,6 +67,7 @@ export class UserJobs implements OnInit {
   loading = true;
   groups: CriteriaJobsGroup[] = [];
   selectedCriteriaId = 'all';
+  sortByScore = true;
   visibleCount = PAGE_SIZE;
 
   constructor(
@@ -102,13 +106,18 @@ export class UserJobs implements OnInit {
       this.selectedCriteriaId === 'all'
         ? this.groups
         : this.groups.filter((g) => g.criteriaId === this.selectedCriteriaId);
-    return groups.flatMap((g) => {
+    const cards = groups.flatMap((g) => {
       const keywords = (g.keywords ?? []).map((k) => k.toLowerCase().trim()).filter(Boolean);
       return g.jobs.map((job) => ({
         job,
         technologies: this.buildTechnologies(job.technologies, keywords),
+        criteriaName: g.criteriaName,
       }));
     });
+    if (this.sortByScore) {
+      return cards.sort((a, b) => (b.job.criteriaMatchScore ?? 0) - (a.job.criteriaMatchScore ?? 0));
+    }
+    return cards;
   }
 
   get visibleJobs(): JobCard[] {
@@ -121,6 +130,12 @@ export class UserJobs implements OnInit {
 
   onFilter(criteriaId: string): void {
     this.selectedCriteriaId = criteriaId;
+    this.visibleCount = PAGE_SIZE;
+    this.expandedSkills.clear();
+  }
+
+  onSortByScore(checked: boolean): void {
+    this.sortByScore = checked;
     this.visibleCount = PAGE_SIZE;
     this.expandedSkills.clear();
   }

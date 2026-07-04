@@ -6,6 +6,7 @@ public interface ICoverLetterStorage
 {
     Task<List<CoverLetter>> GetByCustomerIdAsync(string customerId);
     Task<CoverLetter?> GetByIdAsync(string customerId, string coverLetterId);
+    Task<CoverLetter?> GetLatestForJobAsync(string customerId, string jobId);
     Task<List<CoverLetter>> GetRecentByCustomerIdAsync(string customerId, int max);
     Task CreateAsync(string customerId, string coverLetterId, string name, string resumeId, string jobId);
     Task SetPrimeAsync(string customerId, string coverLetterId);

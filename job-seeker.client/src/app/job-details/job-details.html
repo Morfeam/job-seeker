@@ -1,0 +1,263 @@
+<!-- Banner -->
+<section class="py-4 bg-primary text-white text-center">
+  <div class="container py-2">
+    <h1 class="display-5 fw-bold mb-0">Job Details</h1>
+    <p class="mb-0">Full job information and cover letter generator</p>
+  </div>
+</section>
+
+@if (loading) {
+  <div class="container py-5 text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading…</span>
+    </div>
+  </div>
+} @else if (job) {
+  <div class="container py-5">
+    <div class="row g-4">
+
+      <!-- Full job card -->
+      <div class="col-12 col-lg-7">
+        <div class="card border-0 shadow-sm h-100">
+          <div class="card-body">
+
+            <!-- Header -->
+            <div class="d-flex align-items-start">
+              <span class="d-inline-block bg-dark rounded me-3 flex-shrink-0"
+                    style="width: 2.5rem; height: 2.5rem;" [title]="job.source ?? ''"></span>
+              <div class="flex-grow-1">
+                <h4 class="fw-bold mb-1">{{ job.title }}</h4>
+                <div class="text-muted">
+                  <span class="fw-semibold">{{ job.company }}</span>
+                  @if (job.location) { <span> · {{ job.location }}</span> }
+                  @if (job.isRemote) { <span class="badge bg-info text-dark ms-1">Remote</span> }
+                </div>
+                @if (job.salary) {
+                  <div class="text-success fw-semibold mt-1">{{ job.salary }}</div>
+                }
+                @if (job.companyIndustry) {
+                  <div class="text-muted small mt-1">{{ job.companyIndustry }}</div>
+                }
+              </div>
+              @if (job.criteriaMatchScore != null) {
+                <span class="fw-bold text-primary ms-2 flex-shrink-0" title="Criteria match score">
+                  {{ job.criteriaMatchScore }}
+                </span>
+              }
+            </div>
+
+            <!-- Meta row -->
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              @if (job.jobUrl) {
+                <a [href]="job.jobUrl" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-box-arrow-up-right me-1"></i>Link to job post
+                </a>
+              }
+              @if (job.jobType) {
+                <span class="badge bg-secondary align-self-center">{{ job.jobType }}</span>
+              }
+              @if (job.datePosted) {
+                <span class="text-muted small align-self-center">
+                  <i class="bi bi-calendar3 me-1"></i>Posted {{ job.datePosted | date: 'mediumDate' }}
+                </span>
+              }
+            </div>
+
+            <!-- AI Insights -->
+            @if (job.yearsExperience || job.technologies?.length || job.hardRequirements?.length || job.preferredRequirements?.length || job.softRequirements?.length) {
+              <div class="mt-4 pt-3 border-top">
+                <h6 class="text-uppercase text-muted small fw-bold mb-3">
+                  <i class="bi bi-stars me-1"></i>AI Insights
+                </h6>
+
+                @if (job.yearsExperience) {
+                  <p class="mb-2"><span class="fw-semibold">Experience:</span> {{ job.yearsExperience }}+ years</p>
+                }
+
+                @if (job.technologies?.length) {
+                  <div class="mb-3">
+                    <div class="fw-semibold mb-1">Technologies</div>
+                    @for (tech of job.technologies; track tech.name) {
+                      <span class="badge me-1 mb-1"
+                            [class.bg-primary]="!tech.isPreferred"
+                            [class.bg-secondary]="tech.isPreferred">
+                        {{ tech.name }}@if (tech.yearsExperience) { <span> · {{ tech.yearsExperience }}y</span> }
+                      </span>
+                    }
+                  </div>
+                }
+
+                @if (job.hardRequirements?.length) {
+                  <div class="mb-3">
+                    <div class="fw-semibold mb-1">Hard requirements</div>
+                    <ul class="mb-0 small text-muted">
+                      @for (req of job.hardRequirements; track req) { <li>{{ req }}</li> }
+                    </ul>
+                  </div>
+                }
+
+                @if (job.preferredRequirements?.length) {
+                  <div class="mb-3">
+                    <div class="fw-semibold mb-1">Preferred requirements</div>
+                    <ul class="mb-0 small text-muted">
+                      @for (req of job.preferredRequirements; track req) { <li>{{ req }}</li> }
+                    </ul>
+                  </div>
+                }
+
+                @if (job.softRequirements?.length) {
+                  <div class="mb-3">
+                    <div class="fw-semibold mb-1">Soft requirements</div>
+                    <ul class="mb-0 small text-muted">
+                      @for (req of job.softRequirements; track req) { <li>{{ req }}</li> }
+                    </ul>
+                  </div>
+                }
+
+                @if (job.aiSummary) {
+                  <div class="mb-2">
+                    <div class="fw-semibold mb-1">Summary</div>
+                    <p class="text-muted small mb-0">{{ job.aiSummary }}</p>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- Full description -->
+            @if (job.description) {
+              <div class="mt-4 pt-3 border-top">
+                <button class="btn btn-sm btn-outline-secondary" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#fullDescription">
+                  <i class="bi bi-chevron-down me-1"></i>Full description
+                </button>
+                <div class="collapse mt-2" id="fullDescription">
+                  <div class="card card-body bg-light small" style="white-space: pre-wrap;">{{ job.description }}</div>
+                </div>
+              </div>
+            }
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Generate cover letter form -->
+      <div class="col-12 col-lg-5">
+        <div class="card shadow-sm border rounded-4">
+          <div class="card-body">
+            <h5 class="fw-bold mb-3">Generate a Cover Letter</h5>
+
+            @if (generateSuccess) {
+              <div class="alert alert-success">
+                Cover letter generated! View it on your <a routerLink="/dashboard">dashboard</a>.
+              </div>
+            }
+
+            @if (errorMessage) {
+              <div class="alert alert-danger">{{ errorMessage }}</div>
+            }
+
+            <form [formGroup]="form" (ngSubmit)="onGenerate()">
+              <div class="mb-3">
+                <label class="form-label">Job</label>
+                <input type="text" class="form-control" [value]="job.title + ' — ' + job.company" disabled />
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Resume</label>
+                <select class="form-select" formControlName="resumeId">
+                  <option value="" disabled>
+                    {{ resumes.length ? 'Select a resume…' : 'No resumes found' }}
+                  </option>
+                  @for (r of resumes; track r.id) {
+                    <option [value]="r.id">{{ r.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label d-block">Style</label>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" formControlName="cvEnrichmentStyle"
+                         value="None" id="detailStyleNone" />
+                  <label class="form-check-label" for="detailStyleNone">None</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" formControlName="cvEnrichmentStyle"
+                         value="Prime" id="detailStylePrime" [disabled]="!hasCoverLetters" />
+                  <label class="form-check-label" for="detailStylePrime">Prime</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" formControlName="cvEnrichmentStyle"
+                         value="All" id="detailStyleAll" [disabled]="!hasCoverLetters" />
+                  <label class="form-check-label" for="detailStyleAll">All</label>
+                </div>
+                @if (!hasCoverLetters) {
+                  <div class="form-text">Generate at least one cover letter to unlock Prime/All styles.</div>
+                }
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100" [disabled]="form.invalid || submitting">
+                @if (submitting) {
+                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                }
+                Generate Cover Letter
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Generated Cover Letter (Latest for this job) -->
+      <div class="col-12">
+        @if (loadingCoverLetter) {
+          <div class="text-center py-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+              <span class="visually-hidden">Loading cover letter…</span>
+            </div>
+          </div>
+        } @else if (latestCoverLetter) {
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-3">
+                <h5 class="fw-bold mb-0">Generated Cover Letter (Latest)</h5>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  [class.btn-warning]="latestCoverLetter.isPrime"
+                  [class.btn-outline-secondary]="!latestCoverLetter.isPrime"
+                  title="Set as Prime"
+                  [disabled]="settingPrime"
+                  (click)="onSetPrime(latestCoverLetter.coverLetterId)"
+                >
+                  <i class="bi" [class.bi-star-fill]="latestCoverLetter.isPrime" [class.bi-star]="!latestCoverLetter.isPrime"></i>
+                </button>
+              </div>
+
+              <!-- Cover letter metadata (matches dashboard card info) -->
+              <div class="d-flex flex-wrap gap-3 mb-3 text-muted small">
+                <span><i class="bi bi-file-earmark-text me-1"></i>{{ latestCoverLetter.coverLetterName }}</span>
+                @if (latestCoverLetter.relatedResumeName) {
+                  <span><i class="bi bi-file-earmark-person me-1"></i>{{ latestCoverLetter.relatedResumeName }}</span>
+                }
+                @if (latestCoverLetter.createdDate) {
+                  <span><i class="bi bi-calendar3 me-1"></i>{{ latestCoverLetter.createdDate | date: 'medium' }}</span>
+                }
+                <a [href]="latestCoverLetter.blobDownloadURL" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-download me-1"></i>Download
+                </a>
+              </div>
+
+              <!-- Full cover letter text -->
+              @if (coverLetterText) {
+                <div class="border rounded p-3 bg-light small" style="white-space: pre-wrap; font-family: inherit; max-height: 500px; overflow-y: auto;">{{ coverLetterText }}</div>
+              } @else {
+                <p class="text-muted small mb-0">Cover letter text unavailable.</p>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+    </div>
+  </div>
+}

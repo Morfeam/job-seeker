@@ -47,6 +47,25 @@ public class JobSeekerController : ControllerBase
         ?? User.FindFirst("sub")?.Value;
 
     [Authorize]
+    [HttpGet("get-job")]
+    public async Task<IActionResult> GetJob([FromQuery] string blobFileName)
+    {
+        if (string.IsNullOrWhiteSpace(blobFileName))
+            return BadRequest(new { error = "blobFileName is required." });
+
+        var customerId = GetCustomerId();
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+
+        var job = await _jobResultStorage.GetJobAsync(customerId, blobFileName);
+        if (job == null)
+            return NotFound();
+
+        job.BlobFileName = blobFileName;
+        return Ok(job);
+    }
+
+    [Authorize]
     [HttpGet("slim-criteria")]
     public async Task<IActionResult> GetSlimCriteria()
     {

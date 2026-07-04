@@ -31,4 +31,6 @@ public class JobResult
     // deserialization, so callers (e.g. cover-letter generation) can reference the
     // blob this job came from.
     public string? BlobFileName { get; set; }
+
+    public int? CriteriaMatchScore { get; set; }
 }
