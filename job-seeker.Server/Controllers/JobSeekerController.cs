@@ -119,16 +119,21 @@ public class JobSeekerController : ControllerBase
             .GroupBy(x => x.CriteriaId)
             .ToList();
 
-        var groups = await Task.WhenAll(grouped.Select(async g => new CriteriaJobsGroup
+        var groups = await Task.WhenAll(grouped.Select(async g =>
         {
-            CriteriaId = g.Key,
-            CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
-                ? name
-                : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
-            Keywords = await GetCombinedKeywordsAsync(customerId, g.Key),
-            Jobs = g.Select(x => x.Job!)
-                .OrderByDescending(j => ParsePostedDate(j.DatePosted))
-                .ToList(),
+            var (keywords, experienceInYears) = await GetCriteriaDisplayDataAsync(customerId, g.Key);
+            return new CriteriaJobsGroup
+            {
+                CriteriaId = g.Key,
+                CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
+                    ? name
+                    : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
+                Keywords = keywords,
+                ExperienceInYears = experienceInYears,
+                Jobs = g.Select(x => x.Job!)
+                    .OrderByDescending(j => ParsePostedDate(j.DatePosted))
+                    .ToList(),
+            };
         }));
 
         return Ok(groups);
@@ -225,19 +230,23 @@ public class JobSeekerController : ControllerBase
 
     private static string Bool(bool value) => value ? "true" : "false";
 
-    // Union of a criteria's keywords + technology, used to highlight matching
-    // tech-skill badges on the My Jobs page.
-    private async Task<List<string>> GetCombinedKeywordsAsync(string customerId, string criteriaId)
+    // Criteria fields needed to decorate a job group on the My Jobs page: the union of
+    // keywords + technology (for tech-skill highlighting) and the criteria's
+    // experienceInYears (for the "Match on Years of Experience" filter/display).
+    // Fetches the criteria blob once for both, rather than two separate reads.
+    private async Task<(List<string> Keywords, int? ExperienceInYears)> GetCriteriaDisplayDataAsync(string customerId, string criteriaId)
     {
         var detail = await _criteriaBlobStorage.GetAsync(customerId, criteriaId);
         if (detail == null)
-            return [];
+            return ([], null);
 
-        return detail.Keywords
+        var keywords = detail.Keywords
             .Concat(detail.Technology)
             .Where(v => !string.IsNullOrWhiteSpace(v))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        return (keywords, detail.ExperienceInYears);
     }
 
     // Jobs without a parseable date_posted sort last (oldest).

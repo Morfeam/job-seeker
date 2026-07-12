@@ -56,10 +56,10 @@ export class Criteria implements OnInit {
       location: ['', Validators.required],
       technology: [[] as string[]],
       distance: [null, [Validators.min(1), Validators.max(50)]],
+      experienceInYears: [null, [Validators.min(0), Validators.max(50)]],
       // Disabled for now — these don't affect the scrape or My Jobs matching yet,
       // so the form just submits their empty/default values.
       minSalary: [{ value: null, disabled: true }],
-      experienceInYears: [{ value: null, disabled: true }],
       jobType: [{ value: '', disabled: true }],
       hoursOld: [null],
     });

@@ -6,5 +6,6 @@ public class CriteriaJobsGroup
     public string CriteriaId { get; set; } = string.Empty;
     public string CriteriaName { get; set; } = string.Empty;
     public List<string> Keywords { get; set; } = [];
+    public int? ExperienceInYears { get; set; }
     public List<JobResult> Jobs { get; set; } = [];
 }

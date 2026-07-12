@@ -19,13 +19,16 @@ from notifications.email import send_results_email
 log = logging.getLogger(__name__)
 
 
-def _calculate_match_score(job, keywords: list[str], technology: list[str]) -> int:
+def _calculate_match_score(job, keywords: list[str], technology: list[str], experience_in_years: int | None) -> int:
     """Score a job against the criteria that found it.
 
     Each matched keyword scores 10 pts (checked against the job's AI-enriched
     technology names first, then the job title + description as a fallback).
     Each matched technology entry scores 5 pts (enriched technology names only).
     Matching is case-insensitive substring in either direction.
+    A job whose (general, AI-determined) required years of experience is less than
+    or equal to the criteria's experienceInYears scores a flat +20 pts bonus —
+    skipped entirely if either value is unknown, since there's nothing to compare.
     """
     tech_names = [t.name.lower() for t in (job.technologies or [])]
     job_text = f"{job.title or ''} {job.description or ''}".lower()
@@ -42,6 +45,9 @@ def _calculate_match_score(job, keywords: list[str], technology: list[str]) -> i
         tech_lower = tech.lower()
         if any(tech_lower in t or t in tech_lower for t in tech_names):
             score += 5
+
+    if experience_in_years is not None and job.years_experience is not None and job.years_experience <= experience_in_years:
+        score += 20
 
     return score
 
@@ -104,6 +110,7 @@ def main() -> None:
     criteria = load_criteria(customer_id, args.criteria_id)
     keywords: list[str] = criteria["keywords"]
     technology: list[str] = criteria.get("technology", [])
+    experience_in_years: int | None = criteria.get("experienceInYears")
     location: str = criteria["location"]
     distance: int | None = criteria.get("distance")
     hours_old: int | None = criteria.get("hoursOld")
@@ -159,7 +166,7 @@ def main() -> None:
 
     log.info("Scoring jobs against criteria...")
     for job in normalized:
-        job.criteria_match_score = _calculate_match_score(job, keywords, technology)
+        job.criteria_match_score = _calculate_match_score(job, keywords, technology, experience_in_years)
 
     if args.what_if:
         log.info("[WHAT-IF] Dry run — skipping Azure writes and email")

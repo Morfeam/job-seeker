@@ -45,6 +45,7 @@ interface CriteriaJobsGroup {
   criteriaId: string;
   criteriaName: string;
   keywords: string[] | null;
+  experienceInYears: number | null;
   jobs: JobResult[];
 }
 
@@ -52,6 +53,7 @@ interface JobCard {
   job: JobResult;
   technologies: DisplayTechnology[];
   criteriaName: string;
+  criteriaExperienceInYears: number | null;
 }
 
 const PAGE_SIZE = 10;
@@ -68,6 +70,7 @@ export class UserJobs implements OnInit {
   groups: CriteriaJobsGroup[] = [];
   selectedCriteriaId = 'all';
   sortByScore = true;
+  matchYearsOfExperience = true;
   visibleCount = PAGE_SIZE;
 
   constructor(
@@ -106,14 +109,26 @@ export class UserJobs implements OnInit {
       this.selectedCriteriaId === 'all'
         ? this.groups
         : this.groups.filter((g) => g.criteriaId === this.selectedCriteriaId);
-    const cards = groups.flatMap((g) => {
+    let cards = groups.flatMap((g) => {
       const keywords = (g.keywords ?? []).map((k) => k.toLowerCase().trim()).filter(Boolean);
       return g.jobs.map((job) => ({
         job,
         technologies: this.buildTechnologies(job.technologies, keywords),
         criteriaName: g.criteriaName,
+        criteriaExperienceInYears: g.experienceInYears,
       }));
     });
+    if (this.matchYearsOfExperience) {
+      // Fail open: only hide a card when BOTH values are known and the job
+      // requires more years than the criteria specifies. Missing data on either
+      // side stays visible since we can't tell if it's disqualifying.
+      cards = cards.filter((c) => {
+        const jobYears = c.job.yearsExperience;
+        const criteriaYears = c.criteriaExperienceInYears;
+        if (jobYears == null || criteriaYears == null) return true;
+        return jobYears <= criteriaYears;
+      });
+    }
     if (this.sortByScore) {
       return cards.sort((a, b) => (b.job.criteriaMatchScore ?? 0) - (a.job.criteriaMatchScore ?? 0));
     }
@@ -136,6 +151,12 @@ export class UserJobs implements OnInit {
 
   onSortByScore(checked: boolean): void {
     this.sortByScore = checked;
+    this.visibleCount = PAGE_SIZE;
+    this.expandedSkills.clear();
+  }
+
+  onMatchYearsOfExperience(checked: boolean): void {
+    this.matchYearsOfExperience = checked;
     this.visibleCount = PAGE_SIZE;
     this.expandedSkills.clear();
   }

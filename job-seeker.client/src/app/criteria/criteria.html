@@ -93,6 +93,15 @@
                     }
                   </div>
                 </div>
+
+                <div class="col-12 col-lg-6">
+                  <label class="form-label">Experience (yrs)</label>
+                  <input type="number" class="form-control" min="0" max="50" formControlName="experienceInYears" />
+                  @if (form.get('experienceInYears')?.touched && form.get('experienceInYears')?.invalid) {
+                    <small class="text-danger">Experience must be between 0 and 50 years.</small>
+                  }
+                  <div class="form-text">Affects your search results directly — jobs requiring more years than this are scored lower, and can be filtered out on My Jobs.</div>
+                </div>
               </div>
 
               <!-- Not-yet-used fields, collapsed by default -->
@@ -106,11 +115,6 @@
                     <div class="col-12">
                       <label class="form-label">Min Salary</label>
                       <input type="number" class="form-control" formControlName="minSalary" />
-                      <div class="form-text">Doesn't affect your search results yet.</div>
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label">Experience (yrs)</label>
-                      <input type="number" class="form-control" formControlName="experienceInYears" />
                       <div class="form-text">Doesn't affect your search results yet.</div>
                     </div>
                     <div class="col-12">

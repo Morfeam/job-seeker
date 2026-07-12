@@ -28,6 +28,16 @@
           />
           <label class="form-check-label small" for="sortByScore">Sort by score</label>
         </div>
+        <div class="form-check mb-0">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="matchYearsOfExperience"
+            [checked]="matchYearsOfExperience"
+            (change)="onMatchYearsOfExperience($any($event.target).checked)"
+          />
+          <label class="form-check-label small" for="matchYearsOfExperience">Match on Years of Experience</label>
+        </div>
       </div>
     </div>
   </section>
