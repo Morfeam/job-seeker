@@ -19,10 +19,14 @@ public class JobSeekerController : ControllerBase
     // Most recent jobs returned by GET /get-jobs.
     private const int MaxJobs = 100;
 
+    // Non-admin customers may trigger this many scrapes per UTC calendar day.
+    private const int MaxDailyScrapes = 3;
+
     private readonly ICriteriaStorage _criteriaStorage;
     private readonly ICriteriaBlobStorage _criteriaBlobStorage;
     private readonly IJobLinkStorage _jobLinkStorage;
     private readonly IJobResultStorage _jobResultStorage;
+    private readonly ICustomerStorage _customerStorage;
     private readonly ArmClient _armClient;
     private readonly IConfiguration _config;
 
@@ -31,6 +35,7 @@ public class JobSeekerController : ControllerBase
         ICriteriaBlobStorage criteriaBlobStorage,
         IJobLinkStorage jobLinkStorage,
         IJobResultStorage jobResultStorage,
+        ICustomerStorage customerStorage,
         ArmClient armClient,
         IConfiguration config)
     {
@@ -38,6 +43,7 @@ public class JobSeekerController : ControllerBase
         _criteriaBlobStorage = criteriaBlobStorage;
         _jobLinkStorage = jobLinkStorage;
         _jobResultStorage = jobResultStorage;
+        _customerStorage = customerStorage;
         _armClient = armClient;
         _config = config;
     }
@@ -142,6 +148,10 @@ public class JobSeekerController : ControllerBase
         if (!request.ScrapeLinkedin && !request.ScrapeIndeed)
             return BadRequest(new { error = "Select at least one job source." });
 
+        if (!await _customerStorage.HasScrapeQuotaRemainingAsync(customerId, MaxDailyScrapes))
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { error = $"You've reached your daily limit of {MaxDailyScrapes} job scrapes. Please check back tomorrow." });
+
         var subscriptionId = _config["AZURE_SUBSCRIPTION_ID"];
         var resourceGroup = _config["AZURE_RESOURCE_GROUP"];
         var jobName = _config["CONTAINER_JOB_NAME"];
@@ -180,6 +190,12 @@ public class JobSeekerController : ControllerBase
             template.Containers.Add(execContainer);
 
             await job.StartAsync(WaitUntil.Started, template);
+
+            // Count the scrape only once the trigger has actually succeeded — this
+            // endpoint is fire-and-forget against an async Container App Job, so a
+            // successful trigger (not job completion, which we have no visibility
+            // into) is the only success signal available here.
+            await _customerStorage.RecordScrapeAsync(customerId);
 
             return Accepted();
         }
