@@ -31,6 +31,7 @@ interface JobResult {
   preferredRequirements: string[] | null;
   softRequirements: string[] | null;
   aiSummary: string | null;
+  createdDt: string | null;
   criteriaMatchScore: number | null;
   blobFileName: string | null;
 }

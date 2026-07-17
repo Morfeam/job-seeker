@@ -56,23 +56,27 @@
               @if (job.jobType) {
                 <span class="badge bg-secondary align-self-center">{{ job.jobType }}</span>
               }
+            </div>
+
+            <!-- Scraped/posted date + general years of experience -->
+            <div class="d-flex flex-wrap column-gap-3 row-gap-1 text-muted small mt-2">
+              @if (job.createdDt) {
+                <span><i class="bi bi-clock-history me-1"></i>Scraped {{ job.createdDt | date: 'mediumDate' }}</span>
+              }
               @if (job.datePosted) {
-                <span class="text-muted small align-self-center">
-                  <i class="bi bi-calendar3 me-1"></i>Posted {{ job.datePosted | date: 'mediumDate' }}
-                </span>
+                <span><i class="bi bi-calendar3 me-1"></i>Posted {{ job.datePosted | date: 'mediumDate' }}</span>
+              }
+              @if (job.yearsExperience) {
+                <span><i class="bi bi-briefcase me-1"></i>{{ job.yearsExperience }}+ years experience</span>
               }
             </div>
 
             <!-- AI Insights -->
-            @if (job.yearsExperience || job.technologies?.length || job.hardRequirements?.length || job.preferredRequirements?.length || job.softRequirements?.length) {
+            @if (job.technologies?.length || job.hardRequirements?.length || job.preferredRequirements?.length || job.softRequirements?.length) {
               <div class="mt-4 pt-3 border-top">
                 <h6 class="text-uppercase text-muted small fw-bold mb-3">
                   <i class="bi bi-stars me-1"></i>AI Insights
                 </h6>
-
-                @if (job.yearsExperience) {
-                  <p class="mb-2"><span class="fw-semibold">Experience:</span> {{ job.yearsExperience }}+ years</p>
-                }
 
                 @if (job.technologies?.length) {
                   <div class="mb-3">
