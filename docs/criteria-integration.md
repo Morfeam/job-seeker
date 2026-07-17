@@ -14,6 +14,7 @@ Stored at `criteria/{customerId}/{criteriaId}.json` (container `criteria`), same
 {
   "keywords": ["C#", "Azure"],
   "jobTitleExclusionList": ["lead", "manager", "architect", "director", "intern"],
+  "companyNameExclusionList": ["Acme Staffing", "Randstad"],
   "location": "White Plains, NY",
   "technology": ["C#", "Azure", "Databricks"],
   "distance": 20,
@@ -24,9 +25,9 @@ Stored at `criteria/{customerId}/{criteriaId}.json` (container `criteria`), same
 }
 ```
 
-**Fields the scraper actually reads** (verified against `main.py`, not just docs): `keywords` (required key), `location` (required key), `distance`, `hoursOld`, `jobTitleExclusionList` — all consumed verbatim, so their key names/casing here are load-bearing.
+**Fields the scraper actually reads** (verified against `main.py`, not just docs): `keywords` (required key), `location` (required key), `distance`, `hoursOld`, `jobTitleExclusionList`, `companyNameExclusionList`, `experienceInYears`, `technology` — all consumed verbatim, so their key names/casing here are load-bearing. `jobTitleExclusionList`/`companyNameExclusionList` are applied as post-scrape filters (title/company substring match, OR logic, case-insensitive) before scoring/dedup; `experienceInYears`/`technology`/`keywords` feed `_calculate_match_score` (see `docs/job-match-scoring.md`) rather than affecting which jobs get scraped in the first place.
 
-**Webapp-only fields, not read by the scraper at all**: `technology`, `minSalary`, `experienceInYears`, `jobType`. These exist in the same JSON blob for storage/display purposes only — the scraper silently ignores them today. Wiring them into actual scrape behavior (e.g. having `minSalary`/`jobType` filter results) is out of scope for this feature and would require separate changes to `job-seeker-scraper`.
+**Webapp-only fields, not read by the scraper at all**: `minSalary`, `jobType`. These exist in the same JSON blob for storage/display purposes only — the scraper silently ignores them today. Wiring them into actual scrape behavior (e.g. having `minSalary`/`jobType` filter results) is out of scope for this feature and would require separate changes to `job-seeker-scraper`.
 
 The `CustomerCriteria` table only ever stores `criteriaId` (RowKey) + `CriteriaName` — everything else lives in the blob.
 
@@ -35,7 +36,7 @@ The `CustomerCriteria` table only ever stores `criteriaId` (RowKey) + `CriteriaN
 ### Models (`job-seeker.Server/Models/`)
 - `CriteriaDetail` — the blob contract, `[JsonPropertyName]`-pinned to the schema above.
 - `CriteriaResponseItem` — flat `{id, name, ...CriteriaDetail fields}` response shape for `GET /criteria/get-criteria`, built via `CriteriaResponseItem.From(id, name, detail)`.
-- `AddCriteriaRequest` — POST `/criteria/add` body. `Name` required (3–50 chars), `Location` required (the scraper's hard `criteria["location"]` access means it must always be present). `Keywords`/`JobTitleExclusionList` capped via a custom `[MaxCount(n)]` attribute (5 and 10 respectively) — not required, since an empty list is valid and still satisfies the scraper's required *key*. `Technology` uncapped.
+- `AddCriteriaRequest` — POST `/criteria/add` body. `Name` required (3–50 chars), `Location` required (the scraper's hard `criteria["location"]` access means it must always be present). `Keywords`/`JobTitleExclusionList`/`CompanyNameExclusionList` capped via a custom `[MaxCount(n)]` attribute (5, 10, and 10 respectively) — not required, since an empty list is valid and still satisfies the scraper's required *key*. `Technology` uncapped.
 - `MaxCountAttribute` — reusable `ValidationAttribute` checking `ICollection.Count <= max`.
 - `DeleteCriteriaRequest` — `{ CriteriaId }`.
 
@@ -52,7 +53,7 @@ The `CustomerCriteria` table only ever stores `criteriaId` (RowKey) + `CriteriaN
 
 ## Frontend
 
-- **New `ChipInput` component** (`job-seeker.client/src/app/chip-input/`) — a `ControlValueAccessor` that drops into `formControlName` like a native input. Type a value, press Enter/comma to commit it as a removable chip; an optional `maxItems` input stops accepting new chips at the cap. Used for `keywords`, `jobTitleExclusionList`, and `technology` in the add form.
+- **New `ChipInput` component** (`job-seeker.client/src/app/chip-input/`) — a `ControlValueAccessor` that drops into `formControlName` like a native input. Type a value, press Enter/comma to commit it as a removable chip; an optional `maxItems` input stops accepting new chips at the cap. Used for `keywords`, `jobTitleExclusionList`, `companyNameExclusionList`, and `technology` in the add form.
 - **New `Criteria` component** (`job-seeker.client/src/app/criteria/`), route `/criteria`. Visual style mirrors the My Jobs page (banner, spinner, `row g-4`/`col-12 col-lg-6` card grid).
   - `ngOnInit` auth-guards (redirect to `/sign-in` if no token) then calls `GET /criteria/get-criteria`.
   - Add form mirrors `AddCriteriaRequest` field-for-field, with `maxChipCountValidator(5|10)` (new `chip-count-validator.ts`) backing the chip-input caps client-side, and a fixed `<select>` for `jobType`. On successful `POST /criteria/add`, the form resets and the full criteria list is re-fetched from the backend (not an optimistic append), so the new card reflects the server-assigned id.
@@ -68,4 +69,4 @@ The `CustomerCriteria` table only ever stores `criteriaId` (RowKey) + `CriteriaN
 4. Duplicate name (any case) → 409 + inline error. A 6th keyword is refused by the chip input in-UI; a direct API call bypassing the UI with 6 keywords gets a 400. An invalid `jobType` via direct API call gets a 400.
 5. Click delete on a card → disappears immediately; confirm both the blob and table row are gone in storage; reload the page and confirm it doesn't reappear.
 6. On `/my-jobs`, confirm tech-tag blue/grey highlighting still works (regression check on the `GetCombinedKeywordsAsync` consolidation).
-7. Trigger a scrape (existing `/job-seeker/scrape` flow, unchanged) against a criteria created through the new UI and confirm the Python container reads `keywords`/`location`/`distance`/`hoursOld`/`jobTitleExclusionList` without error.
+7. Trigger a scrape (existing `/job-seeker/scrape` flow, unchanged) against a criteria created through the new UI and confirm the Python container reads `keywords`/`location`/`distance`/`hoursOld`/`jobTitleExclusionList`/`companyNameExclusionList` without error.

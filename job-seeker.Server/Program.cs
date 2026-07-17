@@ -1,4 +1,5 @@
 using System.Threading.RateLimiting;
+using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
 using job_seeker.Server.Authorization;
@@ -21,7 +22,17 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-var credential = new DefaultAzureCredential();
+// In Development, use Azure CLI's login deterministically instead of DefaultAzureCredential's
+// full fallback chain. On a dev machine with multiple signed-in accounts (e.g. Visual Studio
+// or VS Code signed into a different tenant), an earlier credential in that chain can silently
+// "win" with a token from the wrong Azure AD tenant, producing a confusing 401
+// InvalidAuthenticationTokenTenant deep inside an ARM call — even after `az login` to the
+// correct tenant. Optionally pin AZURE_TENANT_ID in local.settings.json if `az account show`
+// isn't already on the right tenant. Production (Azure) is unaffected — it always resolves to
+// the App Service's managed identity via DefaultAzureCredential.
+TokenCredential credential = builder.Environment.IsDevelopment()
+    ? new AzureCliCredential(new AzureCliCredentialOptions { TenantId = builder.Configuration["AZURE_TENANT_ID"] })
+    : new DefaultAzureCredential();
 
 // KEY_VAULT_URI is a non-secret app setting injected by webapp.bicep
 var keyVaultUri = builder.Configuration["KEY_VAULT_URI"] ?? "https://job-seeker-kv-dev.vault.azure.net/";

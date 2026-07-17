@@ -10,6 +10,7 @@ interface CriteriaDetail {
   name: string;
   keywords: string[];
   jobTitleExclusionList: string[];
+  companyNameExclusionList: string[];
   location: string;
   technology: string[];
   distance: number | null;
@@ -53,6 +54,7 @@ export class Criteria implements OnInit {
       name: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(50)]],
       keywords: [[] as string[], [maxChipCountValidator(5)]],
       jobTitleExclusionList: [[] as string[], [maxChipCountValidator(10)]],
+      companyNameExclusionList: [[] as string[], [maxChipCountValidator(10)]],
       location: ['', Validators.required],
       technology: [[] as string[]],
       distance: [null, [Validators.min(1), Validators.max(50)]],
@@ -116,7 +118,7 @@ export class Criteria implements OnInit {
     this.http.post('/criteria/add', this.form.value, { headers: this.authHeaders() }).subscribe({
       next: () => {
         this.submitting = false;
-        this.form.reset({ keywords: [], jobTitleExclusionList: [], technology: [], jobType: '' });
+        this.form.reset({ keywords: [], jobTitleExclusionList: [], companyNameExclusionList: [], technology: [], jobType: '' });
         this.fetchCriteria();
       },
       error: (err: HttpErrorResponse) => {
