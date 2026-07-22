@@ -19,13 +19,16 @@ from notifications.email import send_results_email
 log = logging.getLogger(__name__)
 
 
-def _calculate_match_score(job, keywords: list[str], technology: list[str]) -> int:
+def _calculate_match_score(job, keywords: list[str], technology: list[str], experience_in_years: int | None) -> int:
     """Score a job against the criteria that found it.
 
     Each matched keyword scores 10 pts (checked against the job's AI-enriched
     technology names first, then the job title + description as a fallback).
     Each matched technology entry scores 5 pts (enriched technology names only).
     Matching is case-insensitive substring in either direction.
+    A job whose (general, AI-determined) required years of experience is less than
+    or equal to the criteria's experienceInYears scores a flat +20 pts bonus —
+    skipped entirely if either value is unknown, since there's nothing to compare.
     """
     tech_names = [t.name.lower() for t in (job.technologies or [])]
     job_text = f"{job.title or ''} {job.description or ''}".lower()
@@ -42,6 +45,9 @@ def _calculate_match_score(job, keywords: list[str], technology: list[str]) -> i
         tech_lower = tech.lower()
         if any(tech_lower in t or t in tech_lower for t in tech_names):
             score += 5
+
+    if experience_in_years is not None and job.years_experience is not None and job.years_experience <= experience_in_years:
+        score += 20
 
     return score
 
@@ -80,7 +86,7 @@ def setup_and_parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _print_summary(scrape_counts: dict[str, int], title_excluded: int, duplicates_skipped: int, saved: int, what_if: bool = False) -> None:
+def _print_summary(scrape_counts: dict[str, int], title_excluded: int, company_excluded: int, duplicates_skipped: int, saved: int, what_if: bool = False) -> None:
     print("\n" + "=" * 40)
     print("  JOB SEEKER RUN SUMMARY" + (" [WHAT-IF]" if what_if else ""))
     print("=" * 40)
@@ -88,6 +94,7 @@ def _print_summary(scrape_counts: dict[str, int], title_excluded: int, duplicate
         print(f"  {src.capitalize():<12} {count} jobs found")
     print(f"  {'Total':<12} {sum(scrape_counts.values())} jobs scraped")
     print(f"  {'Excluded':<12} {title_excluded} removed by title filter")
+    print(f"  {'Excluded':<12} {company_excluded} removed by company filter")
     print(f"  {'Duplicates':<12} {duplicates_skipped} already in Azure")
     print(f"  {'Saved':<12} {saved} new jobs {'(dry run)' if what_if else 'uploaded to Azure'}")
     print("=" * 40 + "\n")
@@ -104,11 +111,13 @@ def main() -> None:
     criteria = load_criteria(customer_id, args.criteria_id)
     keywords: list[str] = criteria["keywords"]
     technology: list[str] = criteria.get("technology", [])
+    experience_in_years: int | None = criteria.get("experienceInYears")
     location: str = criteria["location"]
     distance: int | None = criteria.get("distance")
     hours_old: int | None = criteria.get("hoursOld")
     title_exclusions: list[str] = [w.lower() for w in criteria.get("jobTitleExclusionList", [])]
-    log.info(f"Criteria — keywords: {keywords}, location: {location}, distance: {distance}, hoursOld: {hours_old}, titleExclusions: {title_exclusions}")
+    company_exclusions: list[str] = [w.lower() for w in criteria.get("companyNameExclusionList", [])]
+    log.info(f"Criteria — keywords: {keywords}, location: {location}, distance: {distance}, hoursOld: {hours_old}, titleExclusions: {title_exclusions}, companyExclusions: {company_exclusions}")
 
     raw_results: list[dict] = []
     scrape_counts: dict[str, int] = {}
@@ -146,6 +155,16 @@ def main() -> None:
         title_excluded = before - len(normalized)
         log.info(f"Title exclusion filter removed {title_excluded} jobs, {len(normalized)} remaining")
 
+    company_excluded = 0
+    if company_exclusions:
+        before = len(normalized)
+        normalized = [
+            job for job in normalized
+            if not any(word in job.company.lower() for word in company_exclusions)
+        ]
+        company_excluded = before - len(normalized)
+        log.info(f"Company exclusion filter removed {company_excluded} jobs, {len(normalized)} remaining")
+
     before = len(normalized)
     normalized = [job for job in normalized if not job_exists(job, customer_id)]
     duplicates_skipped = before - len(normalized)
@@ -159,13 +178,13 @@ def main() -> None:
 
     log.info("Scoring jobs against criteria...")
     for job in normalized:
-        job.criteria_match_score = _calculate_match_score(job, keywords, technology)
+        job.criteria_match_score = _calculate_match_score(job, keywords, technology, experience_in_years)
 
     if args.what_if:
         log.info("[WHAT-IF] Dry run — skipping Azure writes and email")
         for job in normalized:
             log.info(f"  [{job.source}] {job.title} @ {job.company} | {job.location} | {job.salary}")
-        _print_summary(scrape_counts, title_excluded, duplicates_skipped, saved=0, what_if=True)
+        _print_summary(scrape_counts, title_excluded, company_excluded, duplicates_skipped, saved=0, what_if=True)
         return
 
     log.info("Saving jobs to Azure Blob Storage...")
@@ -184,7 +203,7 @@ def main() -> None:
     else:
         log.info("No --email provided — skipping email")
 
-    _print_summary(scrape_counts, title_excluded, duplicates_skipped, saved=saved)
+    _print_summary(scrape_counts, title_excluded, company_excluded, duplicates_skipped, saved=saved)
 
 
 if __name__ == "__main__":

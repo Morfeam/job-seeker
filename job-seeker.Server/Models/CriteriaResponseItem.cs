@@ -18,6 +18,9 @@ public class CriteriaResponseItem
     [JsonPropertyName("jobTitleExclusionList")]
     public List<string> JobTitleExclusionList { get; set; } = [];
 
+    [JsonPropertyName("companyNameExclusionList")]
+    public List<string> CompanyNameExclusionList { get; set; } = [];
+
     [JsonPropertyName("location")]
     public string Location { get; set; } = string.Empty;
 
@@ -45,6 +48,7 @@ public class CriteriaResponseItem
         Name = name,
         Keywords = detail.Keywords,
         JobTitleExclusionList = detail.JobTitleExclusionList,
+        CompanyNameExclusionList = detail.CompanyNameExclusionList,
         Location = detail.Location,
         Technology = detail.Technology,
         Distance = detail.Distance,

@@ -19,10 +19,14 @@ public class JobSeekerController : ControllerBase
     // Most recent jobs returned by GET /get-jobs.
     private const int MaxJobs = 100;
 
+    // Non-admin customers may trigger this many scrapes per UTC calendar day.
+    private const int MaxDailyScrapes = 3;
+
     private readonly ICriteriaStorage _criteriaStorage;
     private readonly ICriteriaBlobStorage _criteriaBlobStorage;
     private readonly IJobLinkStorage _jobLinkStorage;
     private readonly IJobResultStorage _jobResultStorage;
+    private readonly ICustomerStorage _customerStorage;
     private readonly ArmClient _armClient;
     private readonly IConfiguration _config;
 
@@ -31,6 +35,7 @@ public class JobSeekerController : ControllerBase
         ICriteriaBlobStorage criteriaBlobStorage,
         IJobLinkStorage jobLinkStorage,
         IJobResultStorage jobResultStorage,
+        ICustomerStorage customerStorage,
         ArmClient armClient,
         IConfiguration config)
     {
@@ -38,6 +43,7 @@ public class JobSeekerController : ControllerBase
         _criteriaBlobStorage = criteriaBlobStorage;
         _jobLinkStorage = jobLinkStorage;
         _jobResultStorage = jobResultStorage;
+        _customerStorage = customerStorage;
         _armClient = armClient;
         _config = config;
     }
@@ -113,16 +119,21 @@ public class JobSeekerController : ControllerBase
             .GroupBy(x => x.CriteriaId)
             .ToList();
 
-        var groups = await Task.WhenAll(grouped.Select(async g => new CriteriaJobsGroup
+        var groups = await Task.WhenAll(grouped.Select(async g =>
         {
-            CriteriaId = g.Key,
-            CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
-                ? name
-                : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
-            Keywords = await GetCombinedKeywordsAsync(customerId, g.Key),
-            Jobs = g.Select(x => x.Job!)
-                .OrderByDescending(j => ParsePostedDate(j.DatePosted))
-                .ToList(),
+            var (keywords, experienceInYears) = await GetCriteriaDisplayDataAsync(customerId, g.Key);
+            return new CriteriaJobsGroup
+            {
+                CriteriaId = g.Key,
+                CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
+                    ? name
+                    : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
+                Keywords = keywords,
+                ExperienceInYears = experienceInYears,
+                Jobs = g.Select(x => x.Job!)
+                    .OrderByDescending(j => ParsePostedDate(j.DatePosted))
+                    .ToList(),
+            };
         }));
 
         return Ok(groups);
@@ -141,6 +152,10 @@ public class JobSeekerController : ControllerBase
 
         if (!request.ScrapeLinkedin && !request.ScrapeIndeed)
             return BadRequest(new { error = "Select at least one job source." });
+
+        if (!await _customerStorage.HasScrapeQuotaRemainingAsync(customerId, MaxDailyScrapes))
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { error = $"You've reached your daily limit of {MaxDailyScrapes} job scrapes. Please check back tomorrow." });
 
         var subscriptionId = _config["AZURE_SUBSCRIPTION_ID"];
         var resourceGroup = _config["AZURE_RESOURCE_GROUP"];
@@ -181,6 +196,12 @@ public class JobSeekerController : ControllerBase
 
             await job.StartAsync(WaitUntil.Started, template);
 
+            // Count the scrape only once the trigger has actually succeeded — this
+            // endpoint is fire-and-forget against an async Container App Job, so a
+            // successful trigger (not job completion, which we have no visibility
+            // into) is the only success signal available here.
+            await _customerStorage.RecordScrapeAsync(customerId);
+
             return Accepted();
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
@@ -209,19 +230,23 @@ public class JobSeekerController : ControllerBase
 
     private static string Bool(bool value) => value ? "true" : "false";
 
-    // Union of a criteria's keywords + technology, used to highlight matching
-    // tech-skill badges on the My Jobs page.
-    private async Task<List<string>> GetCombinedKeywordsAsync(string customerId, string criteriaId)
+    // Criteria fields needed to decorate a job group on the My Jobs page: the union of
+    // keywords + technology (for tech-skill highlighting) and the criteria's
+    // experienceInYears (for the "Match on Years of Experience" filter/display).
+    // Fetches the criteria blob once for both, rather than two separate reads.
+    private async Task<(List<string> Keywords, int? ExperienceInYears)> GetCriteriaDisplayDataAsync(string customerId, string criteriaId)
     {
         var detail = await _criteriaBlobStorage.GetAsync(customerId, criteriaId);
         if (detail == null)
-            return [];
+            return ([], null);
 
-        return detail.Keywords
+        var keywords = detail.Keywords
             .Concat(detail.Technology)
             .Where(v => !string.IsNullOrWhiteSpace(v))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        return (keywords, detail.ExperienceInYears);
     }
 
     // Jobs without a parseable date_posted sort last (oldest).

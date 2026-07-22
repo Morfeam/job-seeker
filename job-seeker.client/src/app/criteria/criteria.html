@@ -67,6 +67,11 @@
                   <app-chip-input formControlName="jobTitleExclusionList" [maxItems]="10" placeholder="Add an exclusion…"></app-chip-input>
                   <div class="form-text">Matched with OR logic — any job whose title contains even one of these is excluded from your results.</div>
                 </div>
+                <div class="col-12 col-lg-6">
+                  <label class="form-label">Company Name Exclusions <span class="text-muted small">(max 10)</span></label>
+                  <app-chip-input formControlName="companyNameExclusionList" [maxItems]="10" placeholder="Add a company…"></app-chip-input>
+                  <div class="form-text">Matched with OR logic — any job whose company name contains even one of these (case-insensitive) is excluded from your results.</div>
+                </div>
 
                 <div class="col-12">
                   <label class="form-label">Technology</label>
@@ -93,6 +98,15 @@
                     }
                   </div>
                 </div>
+
+                <div class="col-12 col-lg-6">
+                  <label class="form-label">Experience (yrs)</label>
+                  <input type="number" class="form-control" min="0" max="50" formControlName="experienceInYears" />
+                  @if (form.get('experienceInYears')?.touched && form.get('experienceInYears')?.invalid) {
+                    <small class="text-danger">Experience must be between 0 and 50 years.</small>
+                  }
+                  <div class="form-text">Affects your search results directly — jobs requiring more years than this are scored lower, and can be filtered out on My Jobs.</div>
+                </div>
               </div>
 
               <!-- Not-yet-used fields, collapsed by default -->
@@ -106,11 +120,6 @@
                     <div class="col-12">
                       <label class="form-label">Min Salary</label>
                       <input type="number" class="form-control" formControlName="minSalary" />
-                      <div class="form-text">Doesn't affect your search results yet.</div>
-                    </div>
-                    <div class="col-12">
-                      <label class="form-label">Experience (yrs)</label>
-                      <input type="number" class="form-control" formControlName="experienceInYears" />
                       <div class="form-text">Doesn't affect your search results yet.</div>
                     </div>
                     <div class="col-12">
@@ -178,6 +187,15 @@
                 <div class="mb-2">
                   <div class="fw-semibold mb-1 small">Job Title Exclusions</div>
                   @for (e of c.jobTitleExclusionList; track e) {
+                    <span class="badge bg-secondary me-1 mb-1">{{ e }}</span>
+                  }
+                </div>
+              }
+
+              @if (c.companyNameExclusionList.length) {
+                <div class="mb-2">
+                  <div class="fw-semibold mb-1 small">Company Exclusions</div>
+                  @for (e of c.companyNameExclusionList; track e) {
                     <span class="badge bg-secondary me-1 mb-1">{{ e }}</span>
                   }
                 </div>

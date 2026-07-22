@@ -17,6 +17,12 @@ _SYSTEM = (
     "IMPORTANT: If the language is ambiguous or unclear about whether something is required or preferred, "
     "treat it as a hard requirement. Only mark something as preferred when the posting explicitly uses "
     'language like "nice to have", "preferred", "a plus", "ideally", or "not required".\n\n'
+    '- "years_experience": integer or null — the OVERALL years of experience the posting is looking for '
+    "in the candidate as a whole (e.g. \"5+ years of professional software engineering experience\" -> 5). "
+    "This is distinct from any per-technology years mentioned below — only set this when the posting "
+    "clearly states a general experience requirement for the role itself. If the posting only mentions "
+    "years of experience in the context of specific technologies, or the overall requirement is genuinely "
+    "ambiguous or not stated, return null rather than guessing.\n"
     '- "technologies": list of objects, each with:\n'
     '    - "name": string — the tool, language, framework, or platform\n'
     '    - "is_preferred": boolean — true ONLY when explicitly marked as optional/nice-to-have; default false\n'
@@ -70,8 +76,18 @@ def enrich_job(job: NormalizedJob, client: anthropic.Anthropic) -> NormalizedJob
             if t.get("name")
         ]
 
+        years_experience = data.get("years_experience")
+        if years_experience is None:
+            # Claude couldn't state an overall figure — fall back to the highest
+            # REQUIRED (not preferred/nice-to-have) years across the extracted
+            # technologies, so an optional "5 years with Kubernetes" doesn't
+            # inflate the job's general experience estimate.
+            required_years = [t.years_experience for t in technologies if t.years_experience is not None]
+            years_experience = max(required_years) if required_years else None
+
         return dataclasses.replace(
             job,
+            years_experience=years_experience,
             technologies=technologies,
             hard_requirements=data.get("hard_requirements") or [],
             preferred_requirements=data.get("preferred_requirements") or [],

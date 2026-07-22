@@ -14,6 +14,9 @@ public class AddCriteriaRequest
     [MaxCount(10)]
     public List<string> JobTitleExclusionList { get; set; } = [];
 
+    [MaxCount(10)]
+    public List<string> CompanyNameExclusionList { get; set; } = [];
+
     [Required]
     public string Location { get; set; } = string.Empty;
 
@@ -33,6 +36,7 @@ public class AddCriteriaRequest
     {
         Keywords = Keywords ?? [],
         JobTitleExclusionList = JobTitleExclusionList ?? [],
+        CompanyNameExclusionList = CompanyNameExclusionList ?? [],
         Location = Location,
         Technology = Technology ?? [],
         Distance = Distance,

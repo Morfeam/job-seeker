@@ -14,11 +14,15 @@ public class CoverLetterController : ControllerBase
     private static readonly TimeSpan DownloadLinkValidFor = TimeSpan.FromHours(1);
     private const int MaxAllStyleExamples = 5;
 
+    // Non-admin customers may generate this many cover letters per UTC calendar day.
+    private const int MaxDailyCoverLetters = 3;
+
     private readonly ICoverLetterStorage _coverLetterStorage;
     private readonly ICoverLetterBlobStorage _coverLetterBlobStorage;
     private readonly IResumeStorage _resumeStorage;
     private readonly IResumeBlobStorage _resumeBlobStorage;
     private readonly IJobResultStorage _jobResultStorage;
+    private readonly ICustomerStorage _customerStorage;
     private readonly IAnthropicClient _anthropicClient;
 
     public CoverLetterController(
@@ -27,6 +31,7 @@ public class CoverLetterController : ControllerBase
         IResumeStorage resumeStorage,
         IResumeBlobStorage resumeBlobStorage,
         IJobResultStorage jobResultStorage,
+        ICustomerStorage customerStorage,
         IAnthropicClient anthropicClient)
     {
         _coverLetterStorage = coverLetterStorage;
@@ -34,6 +39,7 @@ public class CoverLetterController : ControllerBase
         _resumeStorage = resumeStorage;
         _resumeBlobStorage = resumeBlobStorage;
         _jobResultStorage = jobResultStorage;
+        _customerStorage = customerStorage;
         _anthropicClient = anthropicClient;
     }
 
@@ -54,6 +60,10 @@ public class CoverLetterController : ControllerBase
         var customerId = GetCustomerId();
         if (string.IsNullOrEmpty(customerId))
             return Unauthorized();
+
+        if (!await _customerStorage.HasCoverLetterQuotaRemainingAsync(customerId, MaxDailyCoverLetters))
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { error = $"You've reached your daily limit of {MaxDailyCoverLetters} cover letters. Please check back tomorrow." });
 
         if (!Guid.TryParse(request.ResumeId, out _))
             return BadRequest(new { error = "resumeId must be a valid guid." });
@@ -134,6 +144,8 @@ public class CoverLetterController : ControllerBase
             await _coverLetterBlobStorage.DeleteAsync(customerId, coverLetterId);
             return Conflict(new { error = $"Failed to save cover letter: {ex.Message}" });
         }
+
+        await _customerStorage.RecordCoverLetterAsync(customerId);
 
         return Ok(new GenerateCoverLetterResponse
         {
