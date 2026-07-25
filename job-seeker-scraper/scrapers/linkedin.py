@@ -7,12 +7,12 @@ log = logging.getLogger(__name__)
 
 # LinkedIn's public (unauthenticated) job search returns results in pages of 25 and
 # throttles further pagination per IP. A single scrape_jobs call reliably returns at
-# most ~25 results regardless of results_wanted. We work around this by making 4 calls
-# with increasing offsets (0, 20, 40, 60), capped at 20 per call, with a 500 ms delay
-# between calls to avoid 429s. This yields up to 80 unique results per run.
+# most ~25 results regardless of results_wanted. We work around this by making 8 calls
+# with increasing offsets (0, 20, 40, ..., 140), capped at 20 per call, with a 500 ms delay
+# between calls to avoid 429s. This yields up to 160 unique results per run.
 # Ref: https://github.com/speedyapply/JobSpy
 
-_CALLS = 4
+_CALLS = 8
 _RESULTS_PER_CALL = 20
 _DELAY_SECONDS = 0.5
 
