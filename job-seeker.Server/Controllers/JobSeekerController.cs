@@ -206,7 +206,12 @@ public class JobSeekerController : ControllerBase
             var template = new ContainerAppJobExecutionTemplate();
             template.Containers.Add(execContainer);
 
-            var startResult = await job.StartAsync(WaitUntil.Started, template);
+            // WaitUntil.Completed here waits only for the execution to be created and
+            // assigned a name — NOT for the scrape itself to finish. The LRO's completed
+            // value type (ContainerAppJobExecutionBase) carries just Id/Name, unlike
+            // ContainerAppJobExecutionData (Status/StartOn/EndOn) used for status polling
+            // below, confirming "completed" means "registered", not "job run finished".
+            var startResult = await job.StartAsync(WaitUntil.Completed, template);
 
             // Count the scrape only once the trigger has actually succeeded — this
             // endpoint is fire-and-forget against an async Container App Job, so a
