@@ -14,4 +14,6 @@ public class SecureCustomer
     public int ScrapeCount { get; set; }
     public DateTimeOffset? LastScrapeDate { get; set; }
     public DateTimeOffset? LastCoverLetterDate { get; set; }
+    public string? LastScrapeExecutionName { get; set; }
+    public string? LastScrapeStatus { get; set; }
 }

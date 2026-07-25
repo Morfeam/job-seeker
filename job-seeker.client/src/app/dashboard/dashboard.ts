@@ -22,6 +22,14 @@ interface CriteriaResponse {
   criteria: CriteriaItem[];
 }
 
+interface ScrapeStatusResponse {
+  hasRecentScrape: boolean;
+  status?: 'Running' | 'Succeeded' | 'Failed';
+  startedAt?: string;
+  errorMessage?: string;
+  canScrapeNow: boolean;
+}
+
 @Component({
   selector: 'app-dashboard',
   standalone: false,
@@ -35,6 +43,7 @@ export class Dashboard implements OnInit {
   criteria: CriteriaItem[] = [];
   isScraping = false;
   toastMessage = '';
+  scrapeStatus: ScrapeStatusResponse | null = null;
 
   @ViewChild('successToast') successToastRef!: ElementRef;
   @ViewChild('errorToast') errorToastRef!: ElementRef;
@@ -81,14 +90,27 @@ export class Dashboard implements OnInit {
         this.criteria = [];
       },
     });
+
+    this.http.get<ScrapeStatusResponse>('/job-seeker/scrape-status', { headers }).subscribe({
+      next: (s) => {
+        this.scrapeStatus = s;
+      },
+      error: () => {
+        this.scrapeStatus = null;
+      },
+    });
   }
 
   atLeastOneSourceSelected(): boolean {
     return !!(this.scrapeForm.value.scrapeIndeed || this.scrapeForm.value.scrapeLinkedin);
   }
 
+  canScrapeNow(): boolean {
+    return this.scrapeStatus?.canScrapeNow !== false;
+  }
+
   onScrape(): void {
-    if (this.scrapeForm.invalid || !this.atLeastOneSourceSelected() || this.isScraping) {
+    if (this.scrapeForm.invalid || !this.atLeastOneSourceSelected() || this.isScraping || !this.canScrapeNow()) {
       return;
     }
 
@@ -104,6 +126,12 @@ export class Dashboard implements OnInit {
     this.http.post('/job-seeker/scrape', this.scrapeForm.value, { headers }).subscribe({
       next: () => {
         this.isScraping = false;
+        this.scrapeStatus = {
+          hasRecentScrape: true,
+          status: 'Running',
+          startedAt: new Date().toISOString(),
+          canScrapeNow: false,
+        };
         this.showToast(this.successToastRef);
       },
       error: (err: HttpErrorResponse) => {

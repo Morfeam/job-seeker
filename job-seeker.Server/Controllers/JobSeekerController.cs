@@ -22,6 +22,18 @@ public class JobSeekerController : ControllerBase
     // Non-admin customers may trigger this many scrapes per UTC calendar day.
     private const int MaxDailyScrapes = 3;
 
+    // A customer may not start another scrape within this many minutes of their last one,
+    // regardless of that scrape's status — a simple time-based cooldown, not a live check
+    // against the Container App Job.
+    private const int ScrapeCooldownMinutes = 15;
+
+    // Scrape status (and its error subtext) is only surfaced on the dashboard while the
+    // triggering scrape started within this many hours; older scrapes show nothing.
+    private const int ScrapeDisplayWindowHours = 24;
+
+    private const string DefaultScrapeFailedMessage =
+        "Oops! Something went wrong with your previous scrape. Please try again!";
+
     private readonly ICriteriaStorage _criteriaStorage;
     private readonly ICriteriaBlobStorage _criteriaBlobStorage;
     private readonly IJobLinkStorage _jobLinkStorage;
@@ -153,18 +165,18 @@ public class JobSeekerController : ControllerBase
         if (!request.ScrapeLinkedin && !request.ScrapeIndeed)
             return BadRequest(new { error = "Select at least one job source." });
 
+        var customer = await _customerStorage.GetByIdAsync(customerId);
+        if (customer?.LastScrapeDate is { } lastScrapeDate &&
+            DateTimeOffset.UtcNow - lastScrapeDate < TimeSpan.FromMinutes(ScrapeCooldownMinutes))
+            return Conflict(new { error = "A job scrape is already in progress. Please wait for it to finish before starting another." });
+
         if (!await _customerStorage.HasScrapeQuotaRemainingAsync(customerId, MaxDailyScrapes))
             return StatusCode(StatusCodes.Status429TooManyRequests,
                 new { error = $"You've reached your daily limit of {MaxDailyScrapes} job scrapes. Please check back tomorrow." });
 
-        var subscriptionId = _config["AZURE_SUBSCRIPTION_ID"];
-        var resourceGroup = _config["AZURE_RESOURCE_GROUP"];
-        var jobName = _config["CONTAINER_JOB_NAME"];
-        if (string.IsNullOrEmpty(subscriptionId) || string.IsNullOrEmpty(resourceGroup) || string.IsNullOrEmpty(jobName))
+        var job = GetContainerAppJob();
+        if (job == null)
             return Conflict(new { error = "Job trigger is not configured." });
-
-        var jobId = ContainerAppJobResource.CreateResourceIdentifier(subscriptionId, resourceGroup, jobName);
-        var job = _armClient.GetContainerAppJobResource(jobId);
 
         try
         {
@@ -194,13 +206,14 @@ public class JobSeekerController : ControllerBase
             var template = new ContainerAppJobExecutionTemplate();
             template.Containers.Add(execContainer);
 
-            await job.StartAsync(WaitUntil.Started, template);
+            var startResult = await job.StartAsync(WaitUntil.Started, template);
 
             // Count the scrape only once the trigger has actually succeeded — this
             // endpoint is fire-and-forget against an async Container App Job, so a
-            // successful trigger (not job completion, which we have no visibility
-            // into) is the only success signal available here.
-            await _customerStorage.RecordScrapeAsync(customerId);
+            // successful trigger (not job completion) is the only success signal
+            // available here. The execution name lets /scrape-status look up
+            // completion later via the Container App Job's own execution history.
+            await _customerStorage.RecordScrapeStartedAsync(customerId, startResult.Value.Name);
 
             return Accepted();
         }
@@ -216,6 +229,98 @@ public class JobSeekerController : ControllerBase
         {
             return Conflict(new { error = $"Failed to start job: {ex.Message}" });
         }
+    }
+
+    [Authorize]
+    [HttpGet("scrape-status")]
+    public async Task<IActionResult> GetScrapeStatus()
+    {
+        var customerId = GetCustomerId();
+        if (string.IsNullOrEmpty(customerId))
+            return Unauthorized();
+
+        var customer = await _customerStorage.GetByIdAsync(customerId);
+        var lastScrapeDate = customer?.LastScrapeDate;
+
+        // No scrape ever recorded, or the cooldown window has long since passed either way —
+        // a new scrape is always allowed once 15 minutes have elapsed since the last one.
+        var canScrapeNow = lastScrapeDate is not { } started ||
+            DateTimeOffset.UtcNow - started >= TimeSpan.FromMinutes(ScrapeCooldownMinutes);
+
+        if (lastScrapeDate is not { } startedAt ||
+            DateTimeOffset.UtcNow - startedAt > TimeSpan.FromHours(ScrapeDisplayWindowHours))
+            return Ok(new ScrapeStatusResponse { HasRecentScrape = false, CanScrapeNow = canScrapeNow });
+
+        var status = customer!.LastScrapeStatus ?? "Running";
+        if (status == "Running")
+            status = await ResolveRunningStatusAsync(customer, startedAt);
+
+        return Ok(new ScrapeStatusResponse
+        {
+            HasRecentScrape = status != null,
+            Status = status,
+            StartedAt = startedAt,
+            ErrorMessage = status == "Failed" ? DefaultScrapeFailedMessage : null,
+            CanScrapeNow = canScrapeNow,
+        });
+    }
+
+    // A stored "Running" status is only ever refreshed here, never persisted as "Running"
+    // itself. Returns null when the run is stuck past the cooldown window — per design, we
+    // never rewrite the row in that case, we just stop surfacing it (the customer table
+    // still shows "Running" underneath, but nothing here or on a later call displays it).
+    private async Task<string?> ResolveRunningStatusAsync(SecureCustomer customer, DateTimeOffset startedAt)
+    {
+        if (DateTimeOffset.UtcNow - startedAt >= TimeSpan.FromMinutes(ScrapeCooldownMinutes))
+            return null;
+
+        if (string.IsNullOrEmpty(customer.LastScrapeExecutionName))
+            return "Running";
+
+        var job = GetContainerAppJob();
+        if (job == null)
+            return "Running";
+
+        try
+        {
+            var execution = await job.GetContainerAppJobExecutionAsync(customer.LastScrapeExecutionName);
+            var resolved = MapExecutionState(execution.Value.Data.Status);
+            if (resolved != "Running")
+                await _customerStorage.UpdateScrapeStatusAsync(customer.Id, resolved);
+
+            return resolved;
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            // Execution record no longer exists (e.g. purged) — leave status as Running
+            // rather than guessing at an outcome; the 15-minute cutoff will hide it soon.
+            return "Running";
+        }
+    }
+
+    // Collapses Azure's native execution states down to the 3 this feature tracks.
+    // Processing is still in flight, so it counts as Running; anything that isn't a clean
+    // Succeeded (Stopped, Degraded, Unknown, Failed) is surfaced as Failed so the generic
+    // subtext points the customer to retry and points devs at the Container App Job logs.
+    private static string MapExecutionState(JobExecutionRunningState? state)
+    {
+        if (state == JobExecutionRunningState.Succeeded)
+            return "Succeeded";
+        if (state == JobExecutionRunningState.Running || state == JobExecutionRunningState.Processing)
+            return "Running";
+        return "Failed";
+    }
+
+    private ContainerAppJobResource? GetContainerAppJob()
+    {
+        var subscriptionId = _config["AZURE_SUBSCRIPTION_ID"];
+        var resourceGroup = _config["AZURE_RESOURCE_GROUP"];
+        var jobName = _config["CONTAINER_JOB_NAME"];
+        if (string.IsNullOrEmpty(subscriptionId) || string.IsNullOrEmpty(resourceGroup) || string.IsNullOrEmpty(jobName))
+            return null;
+
+        var jobId = ContainerAppJobResource.CreateResourceIdentifier(subscriptionId, resourceGroup, jobName);
+        return _armClient.GetContainerAppJobResource(jobId);
     }
 
     private static IEnumerable<string> BuildArgs(ScrapeRequest request, string customerId) =>

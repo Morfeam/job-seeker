@@ -16,6 +16,25 @@
   <!-- Start a Job Search -->
   <section class="py-4 border-bottom">
     <div class="container">
+      @if (scrapeStatus?.hasRecentScrape) {
+        <div class="d-flex justify-content-center mb-3">
+          @if (scrapeStatus!.status === 'Running') {
+            <div class="alert alert-info d-flex align-items-center gap-2 mb-0" role="status">
+              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+              Your last scrape is still running — check back soon!
+            </div>
+          } @else if (scrapeStatus!.status === 'Succeeded') {
+            <div class="alert alert-success mb-0" role="status">
+              Your last scrape completed successfully.
+            </div>
+          } @else if (scrapeStatus!.status === 'Failed') {
+            <div class="alert alert-danger mb-0" role="alert">
+              {{ scrapeStatus!.errorMessage }}
+            </div>
+          }
+        </div>
+      }
+
       <form [formGroup]="scrapeForm" (ngSubmit)="onScrape()" class="d-flex flex-wrap align-items-center justify-content-center gap-3">
         <h5 class="fw-semibold mb-0">Start a Job Search</h5>
 
@@ -50,7 +69,7 @@
         <button
           type="submit"
           class="btn btn-primary"
-          [disabled]="scrapeForm.invalid || isScraping || !atLeastOneSourceSelected()"
+          [disabled]="scrapeForm.invalid || isScraping || !atLeastOneSourceSelected() || !canScrapeNow()"
         >
           @if (isScraping) {
             <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
@@ -62,6 +81,11 @@
       @if (!atLeastOneSourceSelected() && scrapeForm.dirty) {
         <div class="text-center mt-2">
           <small class="text-danger">Select at least one job source.</small>
+        </div>
+      }
+      @if (!canScrapeNow()) {
+        <div class="text-center mt-2">
+          <small class="text-muted">You can start a new scrape once your current one finishes, or after 15 minutes.</small>
         </div>
       }
     </div>
