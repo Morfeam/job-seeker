@@ -6,39 +6,58 @@
   </div>
 </section>
 
-<!-- Filter & Sort bar -->
+<!-- Filter & Sort search form -->
 @if (!loading) {
-  <section class="py-2 border-bottom bg-light">
+  <section class="py-3 border-bottom bg-light">
     <div class="container">
-      <div class="d-flex flex-wrap align-items-center gap-3">
+      <form [formGroup]="searchForm" (ngSubmit)="onSearch()" class="d-flex flex-wrap align-items-center gap-3">
         <span class="fw-semibold small">Filter &amp; Sort</span>
-        <select class="form-select form-select-sm w-auto" (change)="onFilter($any($event.target).value)">
-          <option value="all">All criteria</option>
-          @for (c of criteriaOptions; track c.id) {
-            <option [value]="c.id">{{ c.name }}</option>
-          }
-        </select>
-        <div class="form-check mb-0">
-          <input
-            class="form-check-input"
-            type="checkbox"
-            id="sortByScore"
-            [checked]="sortByScore"
-            (change)="onSortByScore($any($event.target).checked)"
-          />
-          <label class="form-check-label small" for="sortByScore">Sort by score</label>
+
+        <div class="d-flex align-items-center gap-2">
+          <label for="criteriaId" class="form-label mb-0 small">Criteria</label>
+          <select id="criteriaId" class="form-select form-select-sm w-auto" formControlName="criteriaId">
+            <option value="all">All criteria</option>
+            @for (c of availableCriteria; track c.id) {
+              <option [value]="c.id">{{ c.name }}</option>
+            }
+          </select>
         </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <label for="sort" class="form-label mb-0 small">Sort</label>
+          <select id="sort" class="form-select form-select-sm w-auto" formControlName="sort">
+            <option value="recent">Newest first</option>
+            <option value="score">Best match</option>
+          </select>
+        </div>
+
         <div class="form-check mb-0">
           <input
             class="form-check-input"
             type="checkbox"
             id="matchYearsOfExperience"
-            [checked]="matchYearsOfExperience"
-            (change)="onMatchYearsOfExperience($any($event.target).checked)"
+            formControlName="matchYearsOfExperience"
           />
           <label class="form-check-label small" for="matchYearsOfExperience">Match on Years of Experience</label>
         </div>
-      </div>
+
+        <button type="submit" class="btn btn-primary btn-sm" [disabled]="searching">
+          @if (searching) {
+            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+          }
+          Search Jobs
+        </button>
+
+        @if (isCapped) {
+          <span class="text-muted small">Showing {{ cards.length }} of {{ totalMatched }} — refine your filter for more.</span>
+        }
+      </form>
+
+      @if (searchError) {
+        <div class="text-center mt-2">
+          <small class="text-danger">{{ searchError }}</small>
+        </div>
+      }
     </div>
   </section>
 }

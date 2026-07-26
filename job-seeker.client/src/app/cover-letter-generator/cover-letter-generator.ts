@@ -10,8 +10,8 @@ interface JobItem {
   company: string;
 }
 
-interface CriteriaJobsGroup {
-  jobs: { blobFileName: string; title: string; company: string }[];
+interface GetJobsResponse {
+  jobs: { job: { blobFileName: string; title: string; company: string } }[];
 }
 
 interface ResumeItem {
@@ -75,14 +75,16 @@ export class CoverLetterGenerator implements OnInit {
     const headers = this.authHeaders();
 
     forkJoin({
-      jobGroups: this.http.get<CriteriaJobsGroup[]>('/job-seeker/get-jobs', { headers }),
+      jobsResponse: this.http.get<GetJobsResponse>('/job-seeker/get-jobs?limit=200', { headers }),
       resumes: this.http.get<ResumeItem[]>('/resume/get-resumes', { headers }),
       coverLetters: this.http.get<CoverLetterItem[]>('/cv/cover-letters', { headers }),
     }).subscribe({
-      next: ({ jobGroups, resumes, coverLetters }) => {
-        this.jobs = (jobGroups ?? []).flatMap((group) =>
-          (group.jobs ?? []).map((j) => ({ blobFileName: j.blobFileName, title: j.title, company: j.company }))
-        );
+      next: ({ jobsResponse, resumes, coverLetters }) => {
+        this.jobs = (jobsResponse?.jobs ?? []).map((j) => ({
+          blobFileName: j.job.blobFileName,
+          title: j.job.title,
+          company: j.job.company,
+        }));
         this.resumes = resumes ?? [];
         this.coverLetters = coverLetters ?? [];
         this.loading = false;

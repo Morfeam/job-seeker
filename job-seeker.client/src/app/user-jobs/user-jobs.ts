@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { FormBuilder } from '@angular/forms';
 import { AuthService } from '../auth';
 
 interface JobTechnology {
@@ -41,23 +42,30 @@ interface JobResult {
   blobFileName: string | null;
 }
 
-interface CriteriaJobsGroup {
+interface JobCardResult {
+  job: JobResult;
   criteriaId: string;
   criteriaName: string;
   keywords: string[] | null;
   experienceInYears: number | null;
-  jobs: JobResult[];
+}
+
+interface GetJobsResponse {
+  jobs: JobCardResult[];
+  availableCriteria: { id: string; name: string }[];
+  totalMatched: number;
 }
 
 interface JobCard {
   job: JobResult;
   technologies: DisplayTechnology[];
   criteriaName: string;
-  criteriaExperienceInYears: number | null;
 }
 
 const PAGE_SIZE = 10;
 const SKILLS_PREVIEW_COUNT = 10;
+const INITIAL_LIMIT = 20;
+const SEARCH_LIMIT = 200;
 
 @Component({
   selector: 'app-user-jobs',
@@ -67,17 +75,28 @@ const SKILLS_PREVIEW_COUNT = 10;
 })
 export class UserJobs implements OnInit {
   loading = true;
-  groups: CriteriaJobsGroup[] = [];
-  selectedCriteriaId = 'all';
-  sortByScore = true;
-  matchYearsOfExperience = true;
+  searching = false;
+  searchError = '';
+  cards: JobCard[] = [];
+  availableCriteria: { id: string; name: string }[] = [];
+  totalMatched = 0;
   visibleCount = PAGE_SIZE;
+  expandedSkills = new Set<number>();
+
+  searchForm;
 
   constructor(
     private authService: AuthService,
     private http: HttpClient,
-    private router: Router
-  ) {}
+    private router: Router,
+    private fb: FormBuilder
+  ) {
+    this.searchForm = this.fb.group({
+      criteriaId: ['all'],
+      sort: ['recent'],
+      matchYearsOfExperience: [true],
+    });
+  }
 
   ngOnInit(): void {
     const token = this.authService.getToken();
@@ -86,83 +105,74 @@ export class UserJobs implements OnInit {
       return;
     }
 
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
-    this.http.get<CriteriaJobsGroup[]>('/job-seeker/get-jobs', { headers }).subscribe({
-      next: (groups) => {
-        this.groups = groups ?? [];
-        this.loading = false;
-      },
-      error: () => {
-        this.router.navigate(['/error']);
-      },
-    });
-  }
-
-  expandedSkills = new Set<number>();
-
-  get criteriaOptions(): { id: string; name: string }[] {
-    return this.groups.map((g) => ({ id: g.criteriaId, name: g.criteriaName }));
-  }
-
-  get filteredJobs(): JobCard[] {
-    const groups =
-      this.selectedCriteriaId === 'all'
-        ? this.groups
-        : this.groups.filter((g) => g.criteriaId === this.selectedCriteriaId);
-    let cards = groups.flatMap((g) => {
-      const keywords = (g.keywords ?? []).map((k) => k.toLowerCase().trim()).filter(Boolean);
-      return g.jobs.map((job) => ({
-        job,
-        technologies: this.buildTechnologies(job.technologies, keywords),
-        criteriaName: g.criteriaName,
-        criteriaExperienceInYears: g.experienceInYears,
-      }));
-    });
-    if (this.matchYearsOfExperience) {
-      // Fail open: only hide a card when BOTH values are known and the job
-      // requires more years than the criteria specifies. Missing data on either
-      // side stays visible since we can't tell if it's disqualifying.
-      cards = cards.filter((c) => {
-        const jobYears = c.job.yearsExperience;
-        const criteriaYears = c.criteriaExperienceInYears;
-        if (jobYears == null || criteriaYears == null) return true;
-        return jobYears <= criteriaYears;
-      });
-    }
-    if (this.sortByScore) {
-      return cards.sort((a, b) => (b.job.criteriaMatchScore ?? 0) - (a.job.criteriaMatchScore ?? 0));
-    }
-    return cards;
+    this.fetchJobs(INITIAL_LIMIT, true);
   }
 
   get visibleJobs(): JobCard[] {
-    return this.filteredJobs.slice(0, this.visibleCount);
+    return this.cards.slice(0, this.visibleCount);
   }
 
   get hasMore(): boolean {
-    return this.visibleCount < this.filteredJobs.length;
+    return this.visibleCount < this.cards.length;
   }
 
-  onFilter(criteriaId: string): void {
-    this.selectedCriteriaId = criteriaId;
-    this.visibleCount = PAGE_SIZE;
-    this.expandedSkills.clear();
+  get isCapped(): boolean {
+    return this.totalMatched > this.cards.length;
   }
 
-  onSortByScore(checked: boolean): void {
-    this.sortByScore = checked;
-    this.visibleCount = PAGE_SIZE;
-    this.expandedSkills.clear();
-  }
-
-  onMatchYearsOfExperience(checked: boolean): void {
-    this.matchYearsOfExperience = checked;
-    this.visibleCount = PAGE_SIZE;
-    this.expandedSkills.clear();
+  onSearch(): void {
+    if (this.searching) return;
+    this.fetchJobs(SEARCH_LIMIT, false);
   }
 
   loadMore(): void {
     this.visibleCount += PAGE_SIZE;
+  }
+
+  private fetchJobs(limit: number, isInitialLoad: boolean): void {
+    const token = this.authService.getToken();
+    if (!token) {
+      this.router.navigate(['/sign-in']);
+      return;
+    }
+
+    this.searching = true;
+    this.searchError = '';
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+    const { criteriaId, sort, matchYearsOfExperience } = this.searchForm.value;
+    const params = new HttpParams()
+      .set('criteriaId', criteriaId ?? 'all')
+      .set('sort', sort ?? 'recent')
+      .set('matchYearsOfExperience', String(matchYearsOfExperience ?? true))
+      .set('limit', String(limit));
+
+    this.http.get<GetJobsResponse>('/job-seeker/get-jobs', { headers, params }).subscribe({
+      next: (response) => {
+        this.availableCriteria = response.availableCriteria ?? [];
+        this.totalMatched = response.totalMatched ?? 0;
+        this.cards = (response.jobs ?? []).map((j) => {
+          const keywords = (j.keywords ?? []).map((k) => k.toLowerCase().trim()).filter(Boolean);
+          return {
+            job: j.job,
+            technologies: this.buildTechnologies(j.job.technologies, keywords),
+            criteriaName: j.criteriaName,
+          };
+        });
+        this.visibleCount = PAGE_SIZE;
+        this.expandedSkills.clear();
+        this.loading = false;
+        this.searching = false;
+      },
+      error: () => {
+        this.searching = false;
+        if (isInitialLoad) {
+          this.router.navigate(['/error']);
+        } else {
+          this.loading = false;
+          this.searchError = 'Failed to search jobs. Please try again.';
+        }
+      },
+    });
   }
 
   visibleTechnologies(card: JobCard, index: number): DisplayTechnology[] {

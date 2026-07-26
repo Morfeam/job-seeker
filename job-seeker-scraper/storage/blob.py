@@ -9,7 +9,7 @@ _EST = ZoneInfo("America/New_York")
 
 from azure.storage.blob import BlobServiceClient, ContainerClient
 
-from processing.normalize import NormalizedJob
+from processing.normalize import NormalizedJob, Technology
 
 JOB_RESULTS_CONTAINER = "job-seeker-results"
 CRITERIA_CONTAINER = "criteria"
@@ -45,6 +45,22 @@ def job_exists(job: NormalizedJob, customer_id: str) -> bool:
     """Returns True if a blob for this job already exists under the customer's folder."""
     client = _get_blob_service_client().get_blob_client(container=JOB_RESULTS_CONTAINER, blob=blob_name(job, customer_id))
     return client.exists()
+
+
+def load_job(job: NormalizedJob, customer_id: str) -> NormalizedJob | None:
+    """Downloads and reconstructs a previously-saved job's blob, if one exists.
+
+    Used when a job already captured (for some other criteria) matches again —
+    lets it be scored against the new criteria using its already-enriched fields,
+    without re-running enrichment or re-uploading the blob.
+    """
+    client = _get_blob_service_client().get_blob_client(container=JOB_RESULTS_CONTAINER, blob=blob_name(job, customer_id))
+    if not client.exists():
+        return None
+    data = json.loads(client.download_blob().readall())
+    if data.get("technologies"):
+        data["technologies"] = [Technology(**t) for t in data["technologies"]]
+    return NormalizedJob(**data)
 
 
 def save_job(job: NormalizedJob, customer_id: str) -> bool:

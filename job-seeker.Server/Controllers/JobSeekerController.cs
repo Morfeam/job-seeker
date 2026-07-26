@@ -16,8 +16,8 @@ public class JobSeekerController : ControllerBase
     // Name of the container inside the Container App Job whose args we override.
     private const string ScraperContainerName = "job-seeker";
 
-    // Most recent jobs returned by GET /get-jobs.
-    private const int MaxJobs = 100;
+    // Hard ceiling on GET /get-jobs's limit query param, regardless of what's requested.
+    private const int MaxJobsLimit = 200;
 
     // Non-admin customers may trigger this many scrapes per UTC calendar day.
     private const int MaxDailyScrapes = 3;
@@ -103,53 +103,95 @@ public class JobSeekerController : ControllerBase
 
     [Authorize]
     [HttpGet("get-jobs")]
-    public async Task<IActionResult> GetJobs()
+    public async Task<IActionResult> GetJobs(
+        [FromQuery] string? criteriaId,
+        [FromQuery] string sort = "recent",
+        [FromQuery] bool matchYearsOfExperience = true,
+        [FromQuery] int limit = 20)
     {
         var customerId = GetCustomerId();
         if (string.IsNullOrEmpty(customerId))
             return Unauthorized();
 
-        var links = await _jobLinkStorage.GetRecentByCustomerIdAsync(customerId, MaxJobs);
+        limit = Math.Clamp(limit, 1, MaxJobsLimit);
 
-        // Read each job's blob in parallel, preserving its criteria association.
-        var loaded = await Task.WhenAll(links.Select(async link =>
-        {
-            var job = await _jobResultStorage.GetJobAsync(customerId, link.BlobFileName);
-            if (job != null)
-                job.BlobFileName = link.BlobFileName;
-            return (link.CriteriaId, Job: job);
-        }));
+        // Full per-customer link set, sorted/filtered on its cheap fields (Timestamp,
+        // CriteriaMatchScore, YearsExperience, CriteriaId) — no blob reads yet. This is
+        // also what makes the criteria filter dropdown always reflect every criteria the
+        // customer has jobs for, not just whatever survived an earlier recency cut.
+        var allLinks = await _jobLinkStorage.GetAllByCustomerIdAsync(customerId);
 
-        // Resolve criteria id -> display name.
-        var criteria = await _criteriaStorage.GetByCustomerIdAsync(customerId);
-        var nameById = criteria
+        var criteriaList = await _criteriaStorage.GetByCustomerIdAsync(customerId);
+        var nameById = criteriaList
             .GroupBy(c => c.Id)
             .ToDictionary(g => g.Key, g => g.First().Name);
 
-        var grouped = loaded
-            .Where(x => x.Job != null)
-            .GroupBy(x => x.CriteriaId)
+        // One criteria-blob read per distinct criteria present (not per job).
+        var distinctCriteriaIds = allLinks.Select(l => l.CriteriaId).Distinct().ToList();
+        var displayDataById = new Dictionary<string, (List<string> Keywords, int? ExperienceInYears)>();
+        foreach (var id in distinctCriteriaIds)
+            displayDataById[id] = await GetCriteriaDisplayDataAsync(customerId, id);
+
+        var availableCriteria = distinctCriteriaIds
+            .Select(id => new CriteriaItem { Id = id, Name = ResolveCriteriaName(id, nameById) })
             .ToList();
 
-        var groups = await Task.WhenAll(grouped.Select(async g =>
+        IEnumerable<JobLink> filtered = allLinks;
+        if (!string.IsNullOrEmpty(criteriaId) && criteriaId != "all")
+            filtered = filtered.Where(l => l.CriteriaId == criteriaId);
+
+        if (matchYearsOfExperience)
         {
-            var (keywords, experienceInYears) = await GetCriteriaDisplayDataAsync(customerId, g.Key);
-            return new CriteriaJobsGroup
+            // Fail open: only exclude a link when both values are known and the job
+            // requires more years than its own criteria specifies.
+            filtered = filtered.Where(l =>
             {
-                CriteriaId = g.Key,
-                CriteriaName = nameById.TryGetValue(g.Key, out var name) && !string.IsNullOrEmpty(name)
-                    ? name
-                    : string.IsNullOrEmpty(g.Key) ? "Uncategorized" : g.Key,
+                var experienceInYears = displayDataById.TryGetValue(l.CriteriaId, out var d) ? d.ExperienceInYears : null;
+                return l.YearsExperience == null || experienceInYears == null || l.YearsExperience <= experienceInYears;
+            });
+        }
+
+        filtered = sort == "score"
+            ? filtered.OrderByDescending(l => l.CriteriaMatchScore ?? 0)
+            : filtered.OrderByDescending(l => l.Timestamp ?? DateTimeOffset.MinValue);
+
+        var filteredList = filtered.ToList();
+        var page = filteredList.Take(limit).ToList();
+
+        // Only the page actually being returned pays for a blob read.
+        var jobCards = await Task.WhenAll(page.Select(async link =>
+        {
+            var job = await _jobResultStorage.GetJobAsync(customerId, link.BlobFileName);
+            if (job == null)
+                return null;
+            job.BlobFileName = link.BlobFileName;
+
+            var (keywords, experienceInYears) = displayDataById.TryGetValue(link.CriteriaId, out var d)
+                ? d
+                : ([], null);
+
+            return new JobCardResult
+            {
+                Job = job,
+                CriteriaId = link.CriteriaId,
+                CriteriaName = ResolveCriteriaName(link.CriteriaId, nameById),
                 Keywords = keywords,
                 ExperienceInYears = experienceInYears,
-                Jobs = g.Select(x => x.Job!)
-                    .OrderByDescending(j => ParsePostedDate(j.DatePosted))
-                    .ToList(),
             };
         }));
 
-        return Ok(groups);
+        return Ok(new GetJobsResponse
+        {
+            Jobs = jobCards.Where(j => j != null).Select(j => j!).ToList(),
+            AvailableCriteria = availableCriteria,
+            TotalMatched = filteredList.Count,
+        });
     }
+
+    private static string ResolveCriteriaName(string criteriaId, Dictionary<string, string> nameById) =>
+        nameById.TryGetValue(criteriaId, out var name) && !string.IsNullOrEmpty(name)
+            ? name
+            : string.IsNullOrEmpty(criteriaId) ? "Uncategorized" : criteriaId;
 
     [Authorize]
     [HttpPost("scrape")]
@@ -358,14 +400,4 @@ public class JobSeekerController : ControllerBase
 
         return (keywords, detail.ExperienceInYears);
     }
-
-    // Jobs without a parseable date_posted sort last (oldest).
-    private static DateTimeOffset ParsePostedDate(string? value) =>
-        DateTimeOffset.TryParse(
-            value,
-            System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.AssumeUniversal,
-            out var parsed)
-            ? parsed
-            : DateTimeOffset.MinValue;
 }

@@ -12,7 +12,7 @@ from scrapers.indeed import scrape_indeed
 from scrapers.linkedin import scrape_linkedin
 from processing.normalize import normalize_job
 from processing.enrich import enrich_job
-from storage.blob import load_criteria, save_job, job_exists, blob_file_name
+from storage.blob import load_criteria, save_job, load_job, job_exists, blob_file_name
 from storage.table import upsert_job
 from notifications.email import send_results_email
 
@@ -86,7 +86,7 @@ def setup_and_parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _print_summary(scrape_counts: dict[str, int], title_excluded: int, company_excluded: int, duplicates_skipped: int, saved: int, what_if: bool = False) -> None:
+def _print_summary(scrape_counts: dict[str, int], title_excluded: int, company_excluded: int, already_captured: int, saved: int, linked: int = 0, what_if: bool = False) -> None:
     print("\n" + "=" * 40)
     print("  JOB SEEKER RUN SUMMARY" + (" [WHAT-IF]" if what_if else ""))
     print("=" * 40)
@@ -95,8 +95,9 @@ def _print_summary(scrape_counts: dict[str, int], title_excluded: int, company_e
     print(f"  {'Total':<12} {sum(scrape_counts.values())} jobs scraped")
     print(f"  {'Excluded':<12} {title_excluded} removed by title filter")
     print(f"  {'Excluded':<12} {company_excluded} removed by company filter")
-    print(f"  {'Duplicates':<12} {duplicates_skipped} already in Azure")
+    print(f"  {'Existing':<12} {already_captured} already in Azure (from another criteria/run)")
     print(f"  {'Saved':<12} {saved} new jobs {'(dry run)' if what_if else 'uploaded to Azure'}")
+    print(f"  {'Linked':<12} {linked} existing jobs newly linked to this criteria{' (dry run)' if what_if else ''}")
     print("=" * 40 + "\n")
 
 
@@ -165,45 +166,66 @@ def main() -> None:
         company_excluded = before - len(normalized)
         log.info(f"Company exclusion filter removed {company_excluded} jobs, {len(normalized)} remaining")
 
-    before = len(normalized)
-    normalized = [job for job in normalized if not job_exists(job, customer_id)]
-    duplicates_skipped = before - len(normalized)
-    log.info(f"Dedup: {duplicates_skipped} already in Azure, {len(normalized)} new jobs to process")
+    # Split rather than drop: a job already captured under some other criteria/run
+    # still needs to be scored and linked against *this* criteria — it's just not
+    # re-enriched or re-uploaded, since its blob (and enrichment) already exist.
+    new_jobs, already_captured = [], []
+    for job in normalized:
+        (already_captured if job_exists(job, customer_id) else new_jobs).append(job)
+    log.info(f"Dedup: {len(already_captured)} already in Azure, {len(new_jobs)} new jobs to process")
 
     if args.enrich:
         log.info("Enriching job descriptions via Claude...")
         client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-        normalized = [enrich_job(job, client) for job in normalized]
+        new_jobs = [enrich_job(job, client) for job in new_jobs]
         log.info("Enrichment complete")
 
-    log.info("Scoring jobs against criteria...")
-    for job in normalized:
+    log.info("Scoring new jobs against criteria...")
+    for job in new_jobs:
         job.criteria_match_score = _calculate_match_score(job, keywords, technology, experience_in_years)
+
+    # Reload each already-captured job's existing (already-enriched) blob so it can
+    # be scored against this criteria without re-paying for enrichment.
+    log.info("Scoring previously-captured jobs against this criteria...")
+    already_captured_scored = []
+    for job in already_captured:
+        existing = load_job(job, customer_id)
+        if existing is None:
+            log.warning(f"Expected existing blob for {job.source}:{job.id} but it was missing — skipping link for this run")
+            continue
+        existing.criteria_match_score = _calculate_match_score(existing, keywords, technology, experience_in_years)
+        already_captured_scored.append(existing)
 
     if args.what_if:
         log.info("[WHAT-IF] Dry run — skipping Azure writes and email")
-        for job in normalized:
+        for job in new_jobs + already_captured_scored:
             log.info(f"  [{job.source}] {job.title} @ {job.company} | {job.location} | {job.salary}")
-        _print_summary(scrape_counts, title_excluded, company_excluded, duplicates_skipped, saved=0, what_if=True)
+        _print_summary(scrape_counts, title_excluded, company_excluded, len(already_captured), saved=0, linked=0, what_if=True)
         return
 
-    log.info("Saving jobs to Azure Blob Storage...")
-    saved, skipped = 0, 0
-    for job in normalized:
+    log.info("Saving new jobs to Azure Blob Storage...")
+    saved, save_skipped = 0, 0
+    for job in new_jobs:
         if save_job(job, customer_id):
-            upsert_job(job.id, blob_file_name(job), customer_id, args.criteria_id)
+            upsert_job(job.id, blob_file_name(job), customer_id, args.criteria_id, job.criteria_match_score, job.years_experience)
             saved += 1
         else:
-            skipped += 1
-    log.info(f"Saved {saved} new jobs, skipped {skipped} duplicates")
+            save_skipped += 1
+    log.info(f"Saved {saved} new jobs, skipped {save_skipped} (raced with another save)")
 
+    log.info("Linking previously-captured jobs to this criteria...")
+    for job in already_captured_scored:
+        upsert_job(job.id, blob_file_name(job), customer_id, args.criteria_id, job.criteria_match_score, job.years_experience)
+    log.info(f"Linked {len(already_captured_scored)} previously-captured jobs to this criteria")
+
+    all_relevant_jobs = new_jobs + already_captured_scored
     if args.email:
         log.info(f"Sending results email to {args.email}...")
-        send_results_email(normalized, args.email)
+        send_results_email(all_relevant_jobs, args.email)
     else:
         log.info("No --email provided — skipping email")
 
-    _print_summary(scrape_counts, title_excluded, company_excluded, duplicates_skipped, saved=saved)
+    _print_summary(scrape_counts, title_excluded, company_excluded, len(already_captured), saved=saved, linked=len(already_captured_scored))
 
 
 if __name__ == "__main__":

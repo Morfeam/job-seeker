@@ -15,9 +15,9 @@ public class JobLinkTableStorage : IJobLinkStorage
 
     private TableClient GetTable() => _tableService.GetTableClient(TableName);
 
-    public async Task<List<JobLink>> GetRecentByCustomerIdAsync(string customerId, int max)
+    public async Task<List<JobLink>> GetAllByCustomerIdAsync(string customerId)
     {
-        // Table Storage can't order server-side, so pull the partition and sort by Timestamp.
+        // Table Storage can't order server-side, so pull the whole partition and sort in memory.
         var links = new List<JobLink>();
         var pages = GetTable().QueryAsync<TableEntity>(filter: $"PartitionKey eq '{customerId}'");
         await foreach (var entity in pages)
@@ -28,12 +28,13 @@ public class JobLinkTableStorage : IJobLinkStorage
                 BlobFileName = entity.GetString("BlobFileName") ?? string.Empty,
                 CriteriaId = entity.GetString("criteriaId") ?? string.Empty,
                 Timestamp = entity.Timestamp,
+                CriteriaMatchScore = entity.GetInt32("criteriaMatchScore"),
+                YearsExperience = entity.GetInt32("yearsExperience"),
             });
         }
 
         return links
             .OrderByDescending(l => l.Timestamp ?? DateTimeOffset.MinValue)
-            .Take(max)
             .ToList();
     }
 }
