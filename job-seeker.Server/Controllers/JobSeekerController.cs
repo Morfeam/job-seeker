@@ -173,6 +173,14 @@ public class JobSeekerController : ControllerBase
                 return null;
             job.BlobFileName = link.BlobFileName;
 
+            // The blob's own CriteriaMatchScore reflects whichever criteria first
+            // discovered this job — once a job matches more than one criteria, each has
+            // its own score on the JobLinks row (link.CriteriaMatchScore), which is also
+            // what sort=score orders by. Override so the displayed number always matches
+            // the criteria this card is actually being shown under, never a stale value
+            // from a different criteria's original discovery.
+            job.CriteriaMatchScore = link.CriteriaMatchScore;
+
             var (keywords, experienceInYears) = displayDataById.TryGetValue(link.CriteriaId, out var d)
                 ? d
                 : ([], null);

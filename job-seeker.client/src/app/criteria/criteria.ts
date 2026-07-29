@@ -25,6 +25,7 @@ interface CriteriaDetail {
 }
 
 const JOB_TYPES = ['fulltime', 'parttime', 'contract', 'internship'];
+const PAGE_SIZE = 4;
 
 const HOURS_OLD_PRESETS = [
   { hours: 24, label: '1 day' },
@@ -48,6 +49,7 @@ export class Criteria implements OnInit {
 
   form: FormGroup;
   pendingDelete: CriteriaDetail | null = null;
+  visibleCount = PAGE_SIZE;
 
   @ViewChild('criteriaFormCard') formCardRef!: ElementRef;
   @ViewChild('deleteModal') deleteModalRef!: ElementRef;
@@ -88,11 +90,30 @@ export class Criteria implements OnInit {
     return new HttpHeaders({ Authorization: `Bearer ${this.authService.getToken()}` });
   }
 
+  get visibleCriteria(): CriteriaDetail[] {
+    return this.criteriaList.slice(0, this.visibleCount);
+  }
+
+  get hasMoreCriteria(): boolean {
+    return this.visibleCount < this.criteriaList.length;
+  }
+
+  showMoreCriteria(): void {
+    this.visibleCount += PAGE_SIZE;
+  }
+
   private fetchCriteria(): void {
     this.loading = true;
     this.http.get<CriteriaDetail[]>('/criteria/get-criteria', { headers: this.authHeaders() }).subscribe({
       next: (list) => {
-        this.criteriaList = list ?? [];
+        // Most recently created first; criteria without a createdDate (pre-dates that
+        // column) sort last rather than crashing or clustering at the top.
+        this.criteriaList = (list ?? []).slice().sort((a, b) => {
+          const aTime = a.createdDate ? new Date(a.createdDate).getTime() : 0;
+          const bTime = b.createdDate ? new Date(b.createdDate).getTime() : 0;
+          return bTime - aTime;
+        });
+        this.visibleCount = PAGE_SIZE;
         this.loading = false;
       },
       error: () => {
