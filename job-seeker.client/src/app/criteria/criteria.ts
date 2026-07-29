@@ -5,6 +5,8 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { AuthService } from '../auth';
 import { maxChipCountValidator } from './chip-count-validator';
 
+declare var bootstrap: any;
+
 interface CriteriaDetail {
   id: string;
   name: string;
@@ -45,8 +47,10 @@ export class Criteria implements OnInit {
   hoursOldPresets = HOURS_OLD_PRESETS;
 
   form: FormGroup;
+  pendingDelete: CriteriaDetail | null = null;
 
   @ViewChild('criteriaFormCard') formCardRef!: ElementRef;
+  @ViewChild('deleteModal') deleteModalRef!: ElementRef;
 
   constructor(
     private authService: AuthService,
@@ -123,7 +127,24 @@ export class Criteria implements OnInit {
     this.formCardRef?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  onDelete(id: string): void {
+  // Deleting is destructive to more than just the criteria itself — its jobs lose their
+  // keyword/experience context and drop out of the My Jobs filter dropdown (see
+  // ResolveCriteriaName/AvailableCriteria on the backend) — so this requires confirmation
+  // rather than deleting straight from the trash icon.
+  onDeleteClick(c: CriteriaDetail): void {
+    this.pendingDelete = c;
+    bootstrap.Modal.getOrCreateInstance(this.deleteModalRef.nativeElement).show();
+  }
+
+  confirmDelete(): void {
+    if (!this.pendingDelete) return;
+    const id = this.pendingDelete.id;
+    this.pendingDelete = null;
+    bootstrap.Modal.getOrCreateInstance(this.deleteModalRef.nativeElement).hide();
+    this.onDelete(id);
+  }
+
+  private onDelete(id: string): void {
     const previous = this.criteriaList;
     this.criteriaList = this.criteriaList.filter((c) => c.id !== id);
 

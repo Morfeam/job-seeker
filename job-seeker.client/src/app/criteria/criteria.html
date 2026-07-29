@@ -169,7 +169,7 @@
                   >
                     <i class="bi bi-pencil"></i>
                   </button>
-                  <button type="button" class="btn btn-sm btn-outline-danger" (click)="onDelete(c.id)">
+                  <button type="button" class="btn btn-sm btn-outline-danger" (click)="onDeleteClick(c)">
                     <i class="bi bi-trash"></i>
                   </button>
                 </div>
@@ -225,6 +225,28 @@
           </div>
         </div>
       }
+    </div>
+
+    <!-- Delete confirmation -->
+    <div class="modal fade" #deleteModal tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Delete criteria</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Delete <strong>{{ pendingDelete?.name }}</strong>?</p>
+            <p class="text-danger small mb-0">
+              This can't be undone — you won't have a way to view job posts found by scrapes run under this criteria afterward.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger" (click)="confirmDelete()">Delete Criteria</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 }

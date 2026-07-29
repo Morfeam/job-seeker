@@ -135,7 +135,11 @@ public class JobSeekerController : ControllerBase
         foreach (var id in distinctCriteriaIds)
             displayDataById[id] = await GetCriteriaDisplayDataAsync(customerId, id);
 
+        // Deleted criteria are excluded from the filter dropdown entirely (their jobs still
+        // show up under "All criteria", just labeled "Deleted criteria" — see
+        // ResolveCriteriaName) since there's nothing meaningful left to filter *by*.
         var availableCriteria = distinctCriteriaIds
+            .Where(id => string.IsNullOrEmpty(id) || nameById.ContainsKey(id))
             .Select(id => new CriteriaItem { Id = id, Name = ResolveCriteriaName(id, nameById) })
             .ToList();
 
@@ -191,10 +195,18 @@ public class JobSeekerController : ControllerBase
         });
     }
 
-    private static string ResolveCriteriaName(string criteriaId, Dictionary<string, string> nameById) =>
-        nameById.TryGetValue(criteriaId, out var name) && !string.IsNullOrEmpty(name)
+    // Empty criteriaId means the job was never attributed to a specific criteria (e.g. a
+    // default-criteria CLI scrape) — distinct from a non-empty id that no longer resolves,
+    // which means the criteria itself was deleted after the job was linked to it.
+    private static string ResolveCriteriaName(string criteriaId, Dictionary<string, string> nameById)
+    {
+        if (string.IsNullOrEmpty(criteriaId))
+            return "Uncategorized";
+
+        return nameById.TryGetValue(criteriaId, out var name) && !string.IsNullOrEmpty(name)
             ? name
-            : string.IsNullOrEmpty(criteriaId) ? "Uncategorized" : criteriaId;
+            : "Deleted criteria";
+    }
 
     [Authorize]
     [HttpPost("scrape")]
