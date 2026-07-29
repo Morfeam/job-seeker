@@ -39,6 +39,7 @@ public class JobSeekerController : ControllerBase
     private readonly IJobLinkStorage _jobLinkStorage;
     private readonly IJobResultStorage _jobResultStorage;
     private readonly ICustomerStorage _customerStorage;
+    private readonly IScrapeExecutionStorage _scrapeExecutionStorage;
     private readonly ArmClient _armClient;
     private readonly IConfiguration _config;
 
@@ -48,6 +49,7 @@ public class JobSeekerController : ControllerBase
         IJobLinkStorage jobLinkStorage,
         IJobResultStorage jobResultStorage,
         ICustomerStorage customerStorage,
+        IScrapeExecutionStorage scrapeExecutionStorage,
         ArmClient armClient,
         IConfiguration config)
     {
@@ -56,6 +58,7 @@ public class JobSeekerController : ControllerBase
         _jobLinkStorage = jobLinkStorage;
         _jobResultStorage = jobResultStorage;
         _customerStorage = customerStorage;
+        _scrapeExecutionStorage = scrapeExecutionStorage;
         _armClient = armClient;
         _config = config;
     }
@@ -208,9 +211,13 @@ public class JobSeekerController : ControllerBase
             return BadRequest(new { error = "Select at least one job source." });
 
         var customer = await _customerStorage.GetByIdAsync(customerId);
-        if (customer?.LastScrapeDate is { } lastScrapeDate &&
-            DateTimeOffset.UtcNow - lastScrapeDate < TimeSpan.FromMinutes(ScrapeCooldownMinutes))
-            return Conflict(new { error = "A job scrape is already in progress. Please wait for it to finish before starting another." });
+        if (customer?.IsAdmin != true)
+        {
+            var recentExecutions = await _scrapeExecutionStorage.GetRecentByCustomerIdAsync(
+                customerId, DateTimeOffset.UtcNow.AddMinutes(-ScrapeCooldownMinutes));
+            if (recentExecutions.Count > 0)
+                return Conflict(new { error = "A job scrape is already in progress. Please wait for it to finish before starting another." });
+        }
 
         if (!await _customerStorage.HasScrapeQuotaRemainingAsync(customerId, MaxDailyScrapes))
             return StatusCode(StatusCodes.Status429TooManyRequests,
@@ -258,9 +265,10 @@ public class JobSeekerController : ControllerBase
             // Count the scrape only once the trigger has actually succeeded — this
             // endpoint is fire-and-forget against an async Container App Job, so a
             // successful trigger (not job completion) is the only success signal
-            // available here. The execution name lets /scrape-status look up
-            // completion later via the Container App Job's own execution history.
-            await _customerStorage.RecordScrapeStartedAsync(customerId, startResult.Value.Name);
+            // available here. The execution row lets /scrape-status look up completion
+            // later via the Container App Job's own execution history.
+            await _customerStorage.RecordScrapeAsync(customerId);
+            await _scrapeExecutionStorage.CreateAsync(customerId, startResult.Value.Name, request.CriteriaId, DateTimeOffset.UtcNow);
 
             return Accepted();
         }
@@ -287,42 +295,45 @@ public class JobSeekerController : ControllerBase
             return Unauthorized();
 
         var customer = await _customerStorage.GetByIdAsync(customerId);
-        var lastScrapeDate = customer?.LastScrapeDate;
+        var recent = await _scrapeExecutionStorage.GetRecentByCustomerIdAsync(
+            customerId, DateTimeOffset.UtcNow.AddHours(-ScrapeDisplayWindowHours));
 
-        // No scrape ever recorded, or the cooldown window has long since passed either way —
-        // a new scrape is always allowed once 15 minutes have elapsed since the last one.
-        var canScrapeNow = lastScrapeDate is not { } started ||
-            DateTimeOffset.UtcNow - started >= TimeSpan.FromMinutes(ScrapeCooldownMinutes);
+        // Admins are never gated by the cooldown; everyone else is blocked only while a
+        // scrape they started is still within the cooldown window, regardless of its status.
+        var canScrapeNow = customer?.IsAdmin == true ||
+            !recent.Any(e => DateTimeOffset.UtcNow - e.StartedAt < TimeSpan.FromMinutes(ScrapeCooldownMinutes));
 
-        if (lastScrapeDate is not { } startedAt ||
-            DateTimeOffset.UtcNow - startedAt > TimeSpan.FromHours(ScrapeDisplayWindowHours))
-            return Ok(new ScrapeStatusResponse { HasRecentScrape = false, CanScrapeNow = canScrapeNow });
-
-        var status = customer!.LastScrapeStatus ?? "Running";
-        if (status == "Running")
-            status = await ResolveRunningStatusAsync(customer, startedAt);
-
-        return Ok(new ScrapeStatusResponse
+        var items = new List<ScrapeExecutionItem>();
+        foreach (var execution in recent)
         {
-            HasRecentScrape = status != null,
-            Status = status,
-            StartedAt = startedAt,
-            ErrorMessage = status == "Failed" ? DefaultScrapeFailedMessage : null,
-            CanScrapeNow = canScrapeNow,
-        });
+            var status = execution.Status == "Running"
+                ? await ResolveExecutionStatusAsync(customerId, execution)
+                : execution.Status;
+
+            if (status == null)
+                continue; // Stuck past the cooldown window — hidden, row left untouched.
+
+            items.Add(new ScrapeExecutionItem
+            {
+                ScrapeId = execution.ExecutionName,
+                Status = status,
+                StartedAt = execution.StartedAt,
+                EndedAt = execution.EndedAt,
+                ErrorMessage = status == "Failed" ? DefaultScrapeFailedMessage : null,
+            });
+        }
+
+        return Ok(new ScrapeStatusResponse { Executions = items, CanScrapeNow = canScrapeNow });
     }
 
-    // A stored "Running" status is only ever refreshed here, never persisted as "Running"
+    // A stored "Running" execution is only ever refreshed here, never persisted as "Running"
     // itself. Returns null when the run is stuck past the cooldown window — per design, we
-    // never rewrite the row in that case, we just stop surfacing it (the customer table
-    // still shows "Running" underneath, but nothing here or on a later call displays it).
-    private async Task<string?> ResolveRunningStatusAsync(SecureCustomer customer, DateTimeOffset startedAt)
+    // never rewrite the row in that case, we just stop surfacing it (the table still shows
+    // "Running" underneath, but nothing here or on a later call displays it).
+    private async Task<string?> ResolveExecutionStatusAsync(string customerId, ScrapeExecution execution)
     {
-        if (DateTimeOffset.UtcNow - startedAt >= TimeSpan.FromMinutes(ScrapeCooldownMinutes))
+        if (DateTimeOffset.UtcNow - execution.StartedAt >= TimeSpan.FromMinutes(ScrapeCooldownMinutes))
             return null;
-
-        if (string.IsNullOrEmpty(customer.LastScrapeExecutionName))
-            return "Running";
 
         var job = GetContainerAppJob();
         if (job == null)
@@ -330,10 +341,21 @@ public class JobSeekerController : ControllerBase
 
         try
         {
-            var execution = await job.GetContainerAppJobExecutionAsync(customer.LastScrapeExecutionName);
-            var resolved = MapExecutionState(execution.Value.Data.Status);
+            var result = await job.GetContainerAppJobExecutionAsync(execution.ExecutionName);
+            var resolved = MapExecutionState(result.Value.Data.Status);
             if (resolved != "Running")
-                await _customerStorage.UpdateScrapeStatusAsync(customer.Id, resolved);
+            {
+                var endedAt = DateTimeOffset.UtcNow;
+                await _scrapeExecutionStorage.UpdateStatusAsync(customerId, execution.ExecutionName, resolved, endedAt);
+                execution.EndedAt = endedAt;
+
+                // Credit the criteria this scrape was actually run for — only on a clean
+                // Succeeded resolution, and only once (this branch only runs while the
+                // stored status is still "Running", so a later poll of the same execution
+                // short-circuits above and can't double-count it).
+                if (resolved == "Succeeded" && !string.IsNullOrEmpty(execution.CriteriaId))
+                    await _criteriaStorage.IncrementTimesScrapedAsync(customerId, execution.CriteriaId);
+            }
 
             return resolved;
         }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -18,6 +18,8 @@ interface CriteriaDetail {
   experienceInYears: number | null;
   jobType: string | null;
   hoursOld: number | null;
+  timesScraped: number;
+  createdDate: string | null;
 }
 
 const JOB_TYPES = ['fulltime', 'parttime', 'contract', 'internship'];
@@ -43,6 +45,8 @@ export class Criteria implements OnInit {
   hoursOldPresets = HOURS_OLD_PRESETS;
 
   form: FormGroup;
+
+  @ViewChild('criteriaFormCard') formCardRef!: ElementRef;
 
   constructor(
     private authService: AuthService,
@@ -96,6 +100,27 @@ export class Criteria implements OnInit {
 
   setHoursOld(hours: number): void {
     this.form.get('hoursOld')?.setValue(hours);
+  }
+
+  // Pre-loads the add form with a copy of an existing criteria's searchable fields —
+  // name is left blank so the user must supply a new, unique one, and submitting goes
+  // through the normal add flow (creates a brand-new criteria, doesn't touch the source).
+  onClone(c: CriteriaDetail): void {
+    this.form.patchValue({
+      name: '',
+      keywords: c.keywords ?? [],
+      jobTitleExclusionList: c.jobTitleExclusionList ?? [],
+      companyNameExclusionList: c.companyNameExclusionList ?? [],
+      location: c.location ?? '',
+      technology: c.technology ?? [],
+      distance: c.distance,
+      experienceInYears: c.experienceInYears,
+      hoursOld: c.hoursOld,
+    });
+    this.form.markAsPristine();
+    this.form.markAsUntouched();
+    this.errorMessage = '';
+    this.formCardRef?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   onDelete(id: string): void {

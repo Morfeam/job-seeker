@@ -22,11 +22,16 @@ interface CriteriaResponse {
   criteria: CriteriaItem[];
 }
 
+interface ScrapeExecutionItem {
+  scrapeId: string;
+  status: 'Running' | 'Succeeded' | 'Failed';
+  startedAt: string;
+  endedAt: string | null;
+  errorMessage: string | null;
+}
+
 interface ScrapeStatusResponse {
-  hasRecentScrape: boolean;
-  status?: 'Running' | 'Succeeded' | 'Failed';
-  startedAt?: string;
-  errorMessage?: string;
+  executions: ScrapeExecutionItem[];
   canScrapeNow: boolean;
 }
 
@@ -43,7 +48,8 @@ export class Dashboard implements OnInit {
   criteria: CriteriaItem[] = [];
   isScraping = false;
   toastMessage = '';
-  scrapeStatus: ScrapeStatusResponse | null = null;
+  executions: ScrapeExecutionItem[] = [];
+  canScrapeNow = true;
 
   @ViewChild('successToast') successToastRef!: ElementRef;
   @ViewChild('errorToast') errorToastRef!: ElementRef;
@@ -91,26 +97,15 @@ export class Dashboard implements OnInit {
       },
     });
 
-    this.http.get<ScrapeStatusResponse>('/job-seeker/scrape-status', { headers }).subscribe({
-      next: (s) => {
-        this.scrapeStatus = s;
-      },
-      error: () => {
-        this.scrapeStatus = null;
-      },
-    });
+    this.fetchScrapeStatus();
   }
 
   atLeastOneSourceSelected(): boolean {
     return !!(this.scrapeForm.value.scrapeIndeed || this.scrapeForm.value.scrapeLinkedin);
   }
 
-  canScrapeNow(): boolean {
-    return this.scrapeStatus?.canScrapeNow !== false;
-  }
-
   onScrape(): void {
-    if (this.scrapeForm.invalid || !this.atLeastOneSourceSelected() || this.isScraping || !this.canScrapeNow()) {
+    if (this.scrapeForm.invalid || !this.atLeastOneSourceSelected() || this.isScraping || !this.canScrapeNow) {
       return;
     }
 
@@ -126,18 +121,38 @@ export class Dashboard implements OnInit {
     this.http.post('/job-seeker/scrape', this.scrapeForm.value, { headers }).subscribe({
       next: () => {
         this.isScraping = false;
-        this.scrapeStatus = {
-          hasRecentScrape: true,
-          status: 'Running',
-          startedAt: new Date().toISOString(),
-          canScrapeNow: false,
-        };
+        this.fetchScrapeStatus();
         this.showToast(this.successToastRef);
       },
       error: (err: HttpErrorResponse) => {
         this.isScraping = false;
         this.toastMessage = err.error?.error ?? 'Failed to start job search. Please try again.';
         this.showToast(this.errorToastRef);
+      },
+    });
+  }
+
+  formatDuration(e: ScrapeExecutionItem): string {
+    if (!e.endedAt) return '—';
+    const totalSeconds = Math.max(0, Math.round((new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime()) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  }
+
+  private fetchScrapeStatus(): void {
+    const token = this.authService.getToken();
+    if (!token) return;
+
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+    this.http.get<ScrapeStatusResponse>('/job-seeker/scrape-status', { headers }).subscribe({
+      next: (s) => {
+        this.executions = s.executions ?? [];
+        this.canScrapeNow = s.canScrapeNow;
+      },
+      error: () => {
+        this.executions = [];
+        this.canScrapeNow = true;
       },
     });
   }

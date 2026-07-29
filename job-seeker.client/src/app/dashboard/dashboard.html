@@ -16,25 +16,6 @@
   <!-- Start a Job Search -->
   <section class="py-4 border-bottom">
     <div class="container">
-      @if (scrapeStatus?.hasRecentScrape) {
-        <div class="d-flex justify-content-center mb-3">
-          @if (scrapeStatus!.status === 'Running') {
-            <div class="alert alert-info d-flex align-items-center gap-2 mb-0" role="status">
-              <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-              Your last scrape is still running — check back soon!
-            </div>
-          } @else if (scrapeStatus!.status === 'Succeeded') {
-            <div class="alert alert-success mb-0" role="status">
-              Your last scrape completed successfully.
-            </div>
-          } @else if (scrapeStatus!.status === 'Failed') {
-            <div class="alert alert-danger mb-0" role="alert">
-              {{ scrapeStatus!.errorMessage }}
-            </div>
-          }
-        </div>
-      }
-
       <form [formGroup]="scrapeForm" (ngSubmit)="onScrape()" class="d-flex flex-wrap align-items-center justify-content-center gap-3">
         <h5 class="fw-semibold mb-0">Start a Job Search</h5>
 
@@ -69,7 +50,7 @@
         <button
           type="submit"
           class="btn btn-primary"
-          [disabled]="scrapeForm.invalid || isScraping || !atLeastOneSourceSelected() || !canScrapeNow()"
+          [disabled]="scrapeForm.invalid || isScraping || !atLeastOneSourceSelected() || !canScrapeNow"
         >
           @if (isScraping) {
             <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
@@ -83,9 +64,46 @@
           <small class="text-danger">Select at least one job source.</small>
         </div>
       }
-      @if (!canScrapeNow()) {
+      @if (!canScrapeNow) {
         <div class="text-center mt-2">
           <small class="text-muted">You can start a new scrape once your current one finishes, or after 15 minutes.</small>
+        </div>
+      }
+
+      @if (executions.length) {
+        <div class="table-responsive mt-3">
+          <table class="table table-sm table-borderless align-middle mb-0">
+            <thead>
+              <tr class="text-muted small text-uppercase">
+                <th>Scrape ID</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (e of executions; track e.scrapeId) {
+                <tr>
+                  <td class="small font-monospace">{{ e.scrapeId }}</td>
+                  <td>
+                    @if (e.status === 'Running') {
+                      <span class="badge text-bg-info d-inline-flex align-items-center gap-1">
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        Running
+                      </span>
+                    } @else if (e.status === 'Succeeded') {
+                      <span class="badge text-bg-success">Succeeded</span>
+                    } @else {
+                      <span class="badge text-bg-danger">Failed</span>
+                      <div class="small text-danger">{{ e.errorMessage }}</div>
+                    }
+                  </td>
+                  <td>{{ formatDuration(e) }}</td>
+                  <td class="small">{{ e.startedAt | date: 'short' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
         </div>
       }
     </div>

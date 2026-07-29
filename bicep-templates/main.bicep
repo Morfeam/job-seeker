@@ -127,6 +127,11 @@ resource customerCriteriaTable 'Microsoft.Storage/storageAccounts/tableServices/
   name: 'CustomerCriteria'
 }
 
+resource scrapeExecutionsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
+  parent: tableService
+  name: 'ScrapeExecutions'
+}
+
 resource resumesTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2025-01-01' = {
   parent: tableService
   name: 'Resumes'

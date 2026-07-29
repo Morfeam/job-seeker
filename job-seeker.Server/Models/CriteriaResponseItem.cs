@@ -42,7 +42,13 @@ public class CriteriaResponseItem
     [JsonPropertyName("hoursOld")]
     public int? HoursOld { get; set; }
 
-    public static CriteriaResponseItem From(string id, string name, CriteriaDetail detail) => new()
+    [JsonPropertyName("timesScraped")]
+    public int TimesScraped { get; set; }
+
+    [JsonPropertyName("createdDate")]
+    public DateTimeOffset? CreatedDate { get; set; }
+
+    public static CriteriaResponseItem From(string id, string name, int timesScraped, DateTimeOffset? createdDate, CriteriaDetail detail) => new()
     {
         Id = id,
         Name = name,
@@ -56,5 +62,7 @@ public class CriteriaResponseItem
         ExperienceInYears = detail.ExperienceInYears,
         JobType = detail.JobType,
         HoursOld = detail.HoursOld,
+        TimesScraped = timesScraped,
+        CreatedDate = createdDate,
     };
 }

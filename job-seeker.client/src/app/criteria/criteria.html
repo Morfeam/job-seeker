@@ -22,7 +22,7 @@
     <!-- Add-criteria form -->
     <div class="row justify-content-center mb-4">
       <div class="col-12 col-lg-9">
-        <div class="card shadow-sm border rounded-4">
+        <div class="card shadow-sm border rounded-4" #criteriaFormCard>
           <div class="card-body">
             <h5 class="fw-bold mb-3">Add Criteria</h5>
             <form [formGroup]="form" (ngSubmit)="onSubmit()">
@@ -159,9 +159,20 @@
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start">
                 <h5 class="fw-bold mb-1">{{ c.name }}</h5>
-                <button type="button" class="btn btn-sm btn-outline-danger" (click)="onDelete(c.id)">
-                  <i class="bi bi-trash"></i>
-                </button>
+                <div class="d-flex gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    title="Clone &amp; edit as a new criteria"
+                    aria-label="Clone and edit as a new criteria"
+                    (click)="onClone(c)"
+                  >
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-danger" (click)="onDelete(c.id)">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
               </div>
               <p class="text-muted mb-2">{{ c.location }}</p>
 
@@ -207,6 +218,8 @@
                 @if (c.experienceInYears) { <li>Experience: {{ c.experienceInYears }}+ years</li> }
                 @if (c.jobType) { <li>Job type: {{ c.jobType }}</li> }
                 @if (c.hoursOld) { <li>Posted within: {{ c.hoursOld }} hours</li> }
+                <li>Used to scrape {{ c.timesScraped }} time{{ c.timesScraped === 1 ? '' : 's' }}</li>
+                @if (c.createdDate) { <li>Created {{ c.createdDate | date: 'mediumDate' }}</li> }
               </ul>
             </div>
           </div>

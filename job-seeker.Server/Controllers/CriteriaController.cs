@@ -37,7 +37,7 @@ public class CriteriaController : ControllerBase
         var items = await Task.WhenAll(rows.Select(async row =>
         {
             var detail = await _criteriaBlobStorage.GetAsync(customerId, row.Id) ?? new CriteriaDetail();
-            return CriteriaResponseItem.From(row.Id, row.Name, detail);
+            return CriteriaResponseItem.From(row.Id, row.Name, row.TimesScraped, row.CreatedDate, detail);
         }));
 
         return Ok(items);

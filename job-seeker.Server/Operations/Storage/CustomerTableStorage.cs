@@ -77,8 +77,6 @@ public class CustomerTableStorage : ICustomerStorage
         ScrapeCount = entity.GetInt32("ScrapeCount") ?? 0,
         LastScrapeDate = entity.GetDateTimeOffset("LastScrapeDate"),
         LastCoverLetterDate = entity.GetDateTimeOffset("LastCoverLetterDate"),
-        LastScrapeExecutionName = entity.GetString("LastScrapeExecutionName"),
-        LastScrapeStatus = entity.GetString("LastScrapeStatus"),
     };
 
     public async Task<bool> HasScrapeQuotaRemainingAsync(string customerId, int dailyLimit) =>
@@ -87,46 +85,8 @@ public class CustomerTableStorage : ICustomerStorage
     public async Task<bool> HasCoverLetterQuotaRemainingAsync(string customerId, int dailyLimit) =>
         await HasQuotaRemainingAsync(customerId, "CoverLetterCount", "LastCoverLetterDate", dailyLimit);
 
-    public async Task RecordScrapeStartedAsync(string customerId, string executionName)
-    {
-        const int maxAttempts = 3;
-        for (var attempt = 0; attempt < maxAttempts; attempt++)
-        {
-            var entity = await GetEntityByIdAsync(customerId);
-            if (entity == null)
-                return;
-
-            entity["ScrapeCount"] = TodayUsageCount(entity, "ScrapeCount", "LastScrapeDate") + 1;
-            entity["LastScrapeDate"] = DateTimeOffset.UtcNow;
-            entity["LastScrapeExecutionName"] = executionName;
-            entity["LastScrapeStatus"] = "Running";
-
-            try
-            {
-                await GetTable().UpdateEntityAsync(entity, entity.ETag, TableUpdateMode.Merge);
-                return;
-            }
-            catch (RequestFailedException ex) when (ex.Status == 412)
-            {
-                // Concurrent modification — retry with a fresh read.
-            }
-        }
-        // Exhausted retries under contention — same tradeoff as RecordUsageAsync: the trigger
-        // itself already succeeded, so we don't fail the request over a stats-tracking race.
-    }
-
-    // Refreshes just the status column once a live Azure lookup resolves a "Running" scrape
-    // to an end state. No ETag retry: this is an idempotent refresh of Azure's own current
-    // truth, so a lost race under concurrent dashboard loads just means the next poll corrects it.
-    public async Task UpdateScrapeStatusAsync(string customerId, string status)
-    {
-        var entity = await GetEntityByIdAsync(customerId);
-        if (entity == null)
-            return;
-
-        entity["LastScrapeStatus"] = status;
-        await GetTable().UpdateEntityAsync(entity, ETag.All, TableUpdateMode.Merge);
-    }
+    public async Task RecordScrapeAsync(string customerId) =>
+        await RecordUsageAsync(customerId, "ScrapeCount", "LastScrapeDate");
 
     public async Task RecordCoverLetterAsync(string customerId) =>
         await RecordUsageAsync(customerId, "CoverLetterCount", "LastCoverLetterDate");
