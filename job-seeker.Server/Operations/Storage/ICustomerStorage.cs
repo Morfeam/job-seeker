@@ -15,6 +15,7 @@ public interface ICustomerStorage
     // recorded for them since it doubles as usage stats for every customer.
     Task<bool> HasScrapeQuotaRemainingAsync(string customerId, int dailyLimit);
     Task<bool> HasCoverLetterQuotaRemainingAsync(string customerId, int dailyLimit);
+
     Task RecordScrapeAsync(string customerId);
     Task RecordCoverLetterAsync(string customerId);
 }

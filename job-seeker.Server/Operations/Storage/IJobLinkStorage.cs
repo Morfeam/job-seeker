@@ -4,5 +4,5 @@ namespace job_seeker.Server.Operations.Storage;
 
 public interface IJobLinkStorage
 {
-    Task<List<JobLink>> GetRecentByCustomerIdAsync(string customerId, int max);
+    Task<List<JobLink>> GetAllByCustomerIdAsync(string customerId);
 }

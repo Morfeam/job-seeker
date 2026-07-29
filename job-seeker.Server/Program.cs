@@ -112,6 +112,7 @@ builder.Services.AddSingleton<ICustomerStorage, CustomerTableStorage>();
 builder.Services.AddSingleton<ICriteriaStorage, CriteriaTableStorage>();
 builder.Services.AddSingleton<ICriteriaBlobStorage, CriteriaBlobStorage>();
 builder.Services.AddSingleton<IJobLinkStorage, JobLinkTableStorage>();
+builder.Services.AddSingleton<IScrapeExecutionStorage, ScrapeExecutionTableStorage>();
 builder.Services.AddSingleton<IJobResultStorage, JobResultBlobStorage>();
 builder.Services.AddSingleton<IResumeStorage, ResumeTableStorage>();
 builder.Services.AddSingleton<IResumeBlobStorage, ResumeBlobStorage>();

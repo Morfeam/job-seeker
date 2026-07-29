@@ -7,4 +7,6 @@ public class JobLink
     public string BlobFileName { get; set; } = string.Empty;
     public string CriteriaId { get; set; } = string.Empty;
     public DateTimeOffset? Timestamp { get; set; }
+    public int? CriteriaMatchScore { get; set; }
+    public int? YearsExperience { get; set; }
 }
