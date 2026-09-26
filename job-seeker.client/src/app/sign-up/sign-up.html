@@ -57,6 +57,22 @@
         }
       </div>
 
+      <div class="mb-3 form-check">
+        <input type="checkbox" class="form-check-input" id="acceptTerms" formControlName="acceptTerms"
+          [class.is-invalid]="form.get('acceptTerms')?.invalid && form.get('acceptTerms')?.touched">
+        <label class="form-check-label small" for="acceptTerms">
+          I am 18 or older and agree to the
+          <a routerLink="/terms-of-service" fragment="terms" target="_blank" rel="noopener">Terms of Service</a>,
+          <a routerLink="/terms-of-service" fragment="privacy" target="_blank" rel="noopener">Privacy Policy</a>, and
+          <a routerLink="/terms-of-service" fragment="ai" target="_blank" rel="noopener">AI Disclosure</a>,
+          and I have read the
+          <a routerLink="/terms-of-service" fragment="disclaimer" target="_blank" rel="noopener">Job Scraping Disclaimer</a>.
+        </label>
+        @if (form.get('acceptTerms')?.touched && form.get('acceptTerms')?.invalid) {
+          <div class="invalid-feedback">You must accept the Terms of Service to create an account.</div>
+        }
+      </div>
+
       <div class="mb-4 form-check">
         <input type="checkbox" class="form-check-input" id="rememberMe" formControlName="rememberMe">
         <label class="form-check-label" for="rememberMe">Remember me</label>

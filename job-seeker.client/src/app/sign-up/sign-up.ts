@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../auth';
 import { passwordStrengthValidator, passwordMatchValidator } from '../password-validator';
+import { TERMS_VERSION } from '../terms/terms';
 
 @Component({
   selector: 'app-sign-up',
@@ -35,6 +36,7 @@ export class SignUp implements OnInit {
         email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
         password: ['', [Validators.required, passwordStrengthValidator]],
         confirmPassword: ['', Validators.required],
+        acceptTerms: [false, Validators.requiredTrue],
         rememberMe: [false],
       },
       { validators: passwordMatchValidator }
@@ -42,7 +44,10 @@ export class SignUp implements OnInit {
   }
 
   onSubmit(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
     this.loading = true;
     this.errorMessage = '';
 
@@ -51,6 +56,8 @@ export class SignUp implements OnInit {
       lastName: this.form.value.lastName,
       email: this.form.value.email,
       password: this.form.value.password,
+      acceptedTerms: this.form.value.acceptTerms,
+      termsVersion: TERMS_VERSION,
     }).subscribe({
       next: (res) => {
         this.authService.login(res.token, this.form.value.rememberMe);

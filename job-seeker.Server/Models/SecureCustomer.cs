@@ -9,6 +9,8 @@ public class SecureCustomer
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string CreatedDate { get; set; } = string.Empty;
+    public string TermsVersion { get; set; } = string.Empty;
+    public DateTimeOffset? TermsAcceptedDate { get; set; }
     public bool IsAdmin { get; set; }
     public int CoverLetterCount { get; set; }
     public int ScrapeCount { get; set; }

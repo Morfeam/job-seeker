@@ -42,6 +42,9 @@ public class CustomerController : ControllerBase
         if (!PasswordRegex.IsMatch(request.Password))
             return BadRequest(new { error = "Password must be 8–29 characters and contain at least one uppercase letter and one special character." });
 
+        if (!request.AcceptedTerms)
+            return BadRequest(new { error = "You must accept the Terms of Service to create an account." });
+
         if (await _customerStorage.EmailExistsAsync(request.Email))
             return Conflict(new { error = "An account with that email already exists." });
 
@@ -58,6 +61,8 @@ public class CustomerController : ControllerBase
             FirstName = request.FirstName,
             LastName = request.LastName,
             CreatedDate = DateTime.UtcNow.ToString("o"),
+            TermsVersion = request.TermsVersion,
+            TermsAcceptedDate = DateTimeOffset.UtcNow,
         };
 
         await _customerStorage.CreateAsync(customer);
