@@ -23,4 +23,11 @@ public class SignUpRequest
     [MinLength(8)]
     [MaxLength(29)]
     public string Password { get; set; } = string.Empty;
+
+    // Must be true — the controller rejects sign-ups that haven't accepted the Terms of Service.
+    public bool AcceptedTerms { get; set; }
+
+    [Required]
+    [MaxLength(20)]
+    public string TermsVersion { get; set; } = string.Empty;
 }

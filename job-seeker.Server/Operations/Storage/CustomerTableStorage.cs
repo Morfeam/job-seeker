@@ -48,6 +48,8 @@ public class CustomerTableStorage : ICustomerStorage
             ["FirstName"] = customer.FirstName,
             ["LastName"] = customer.LastName,
             ["CreatedDate"] = customer.CreatedDate,
+            ["TermsVersion"] = customer.TermsVersion,
+            ["TermsAcceptedDate"] = customer.TermsAcceptedDate,
         };
         await GetTable().AddEntityAsync(entity);
     }

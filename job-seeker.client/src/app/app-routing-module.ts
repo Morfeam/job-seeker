@@ -13,6 +13,7 @@ import { ErrorPage } from './error/error';
 import { Criteria } from './criteria/criteria';
 import { Resume } from './resume/resume';
 import { JobDetails } from './job-details/job-details';
+import { Terms } from './terms/terms';
 
 const routes: Routes = [
   { path: '', component: Home },
@@ -26,6 +27,8 @@ const routes: Routes = [
   { path: 'criteria', component: Criteria },
   { path: 'resume', component: Resume },
   { path: 'job-details', component: JobDetails },
+  { path: 'terms-of-service', component: Terms },
+  { path: 'terms-and-conditions', redirectTo: 'terms-of-service' },
   { path: 'error', component: ErrorPage },
   { path: '**', redirectTo: '' },
 ];
