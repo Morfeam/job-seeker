@@ -12,15 +12,18 @@ public class ResumeController : ControllerBase
 {
     private static readonly string[] AllowedExtensions = [".pdf", ".md", ".txt", ".html", ".docx"];
     private const long MaxFileSizeBytes = 5L * 1024 * 1024;
+    private const int MaxFileNameLength = 200;
     private static readonly TimeSpan DownloadLinkValidFor = TimeSpan.FromHours(1);
 
     private readonly IResumeStorage _resumeStorage;
     private readonly IResumeBlobStorage _resumeBlobStorage;
+    private readonly ILogger<ResumeController> _logger;
 
-    public ResumeController(IResumeStorage resumeStorage, IResumeBlobStorage resumeBlobStorage)
+    public ResumeController(IResumeStorage resumeStorage, IResumeBlobStorage resumeBlobStorage, ILogger<ResumeController> logger)
     {
         _resumeStorage = resumeStorage;
         _resumeBlobStorage = resumeBlobStorage;
+        _logger = logger;
     }
 
     private string? GetCustomerId() =>
@@ -59,7 +62,14 @@ public class ResumeController : ControllerBase
         if (request.File.Length > MaxFileSizeBytes)
             return BadRequest(new { error = "File exceeds the 5 MB size limit." });
 
-        var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
+        // The client-supplied file name becomes part of the blob path ({customerId}/{fileName}), so
+        // strip any directory components (either separator, since Path.GetFileName on Linux only
+        // knows '/') to keep a crafted name like "../<otherId>/x.pdf" from escaping this customer's folder.
+        var fileName = Path.GetFileName(request.File.FileName.Replace('\\', '/')).Trim();
+        if (fileName.Length == 0 || fileName.Length > MaxFileNameLength || fileName.Any(char.IsControl))
+            return BadRequest(new { error = "Invalid file name." });
+
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(extension))
             return BadRequest(new { error = $"Unsupported file type. Allowed: {string.Join(", ", AllowedExtensions)}" });
 
@@ -67,12 +77,12 @@ public class ResumeController : ControllerBase
         if (string.IsNullOrEmpty(customerId))
             return Unauthorized();
 
-        var resolvedName = string.IsNullOrWhiteSpace(request.Name) ? request.File.FileName : request.Name.Trim();
+        var resolvedName = string.IsNullOrWhiteSpace(request.Name) ? fileName : request.Name.Trim();
 
         var existing = await _resumeStorage.GetByCustomerIdAsync(customerId);
         if (existing.Any(r =>
                 string.Equals(r.Name, resolvedName, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(r.FileName, request.File.FileName, StringComparison.OrdinalIgnoreCase)))
+                || string.Equals(r.FileName, fileName, StringComparison.OrdinalIgnoreCase)))
             return Conflict(new { error = "A resume with that name or file name already exists." });
 
         var resumeId = Guid.NewGuid().ToString();
@@ -80,7 +90,7 @@ public class ResumeController : ControllerBase
         try
         {
             using var stream = request.File.OpenReadStream();
-            await _resumeBlobStorage.UploadAsync(customerId, request.File.FileName, stream, request.File.ContentType);
+            await _resumeBlobStorage.UploadAsync(customerId, fileName, stream, request.File.ContentType);
         }
         catch (RequestFailedException ex) when (ex.Status == 409)
         {
@@ -88,18 +98,20 @@ public class ResumeController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Conflict(new { error = $"Failed to upload resume: {ex.Message}" });
+            _logger.LogError(ex, "Failed to upload resume");
+            return Conflict(new { error = "Failed to upload resume. Please try again." });
         }
 
         try
         {
-            await _resumeStorage.CreateAsync(customerId, resumeId, resolvedName, request.File.FileName, request.AssociatedCriteriaId);
+            await _resumeStorage.CreateAsync(customerId, resumeId, resolvedName, fileName, request.AssociatedCriteriaId);
         }
         catch (Exception ex)
         {
             // Roll back the blob so we don't leave an orphan with no table row.
-            await _resumeBlobStorage.DeleteAsync(customerId, request.File.FileName);
-            return Conflict(new { error = $"Failed to save resume: {ex.Message}" });
+            await _resumeBlobStorage.DeleteAsync(customerId, fileName);
+            _logger.LogError(ex, "Failed to save resume");
+            return Conflict(new { error = "Failed to save resume. Please try again." });
         }
 
         return Ok();
@@ -127,7 +139,8 @@ public class ResumeController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Conflict(new { error = $"Failed to delete resume: {ex.Message}" });
+            _logger.LogError(ex, "Failed to delete resume");
+            return Conflict(new { error = "Failed to delete resume. Please try again." });
         }
 
         try
@@ -136,7 +149,8 @@ public class ResumeController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Conflict(new { error = $"Failed to delete resume: {ex.Message}" });
+            _logger.LogError(ex, "Failed to delete resume");
+            return Conflict(new { error = "Failed to delete resume. Please try again." });
         }
 
         return Ok();

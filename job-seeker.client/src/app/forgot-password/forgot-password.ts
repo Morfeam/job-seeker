@@ -34,9 +34,11 @@ export class ForgotPassword implements OnInit {
         this.successMessage = 'Reset link sent! Check your inbox.';
         this.form.reset();
       },
-      error: () => {
+      error: (err) => {
         this.loading = false;
-        this.errorMessage = 'Something went wrong. Please try again.';
+        this.errorMessage = err.status === 429
+          ? 'Too many requests. Please wait a minute and try again.'
+          : 'Something went wrong. Please try again.';
       },
     });
   }

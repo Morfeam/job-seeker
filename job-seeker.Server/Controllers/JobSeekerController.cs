@@ -42,6 +42,7 @@ public class JobSeekerController : ControllerBase
     private readonly IScrapeExecutionStorage _scrapeExecutionStorage;
     private readonly ArmClient _armClient;
     private readonly IConfiguration _config;
+    private readonly ILogger<JobSeekerController> _logger;
 
     public JobSeekerController(
         ICriteriaStorage criteriaStorage,
@@ -51,7 +52,8 @@ public class JobSeekerController : ControllerBase
         ICustomerStorage customerStorage,
         IScrapeExecutionStorage scrapeExecutionStorage,
         ArmClient armClient,
-        IConfiguration config)
+        IConfiguration config,
+        ILogger<JobSeekerController> logger)
     {
         _criteriaStorage = criteriaStorage;
         _criteriaBlobStorage = criteriaBlobStorage;
@@ -61,6 +63,7 @@ public class JobSeekerController : ControllerBase
         _scrapeExecutionStorage = scrapeExecutionStorage;
         _armClient = armClient;
         _config = config;
+        _logger = logger;
     }
 
     private string? GetCustomerId() =>
@@ -298,11 +301,13 @@ public class JobSeekerController : ControllerBase
         }
         catch (RequestFailedException ex) when (ex.Status == 409)
         {
-            return Conflict(new { error = ex.Message });
+            _logger.LogWarning(ex, "Container job start returned 409");
+            return Conflict(new { error = "The job service is busy. Please try again in a few minutes." });
         }
         catch (RequestFailedException ex)
         {
-            return Conflict(new { error = $"Failed to start job: {ex.Message}" });
+            _logger.LogError(ex, "Failed to start job");
+            return Conflict(new { error = "Failed to start job. Please try again." });
         }
     }
 

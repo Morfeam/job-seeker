@@ -49,7 +49,9 @@ export class SignIn implements OnInit {
       },
       error: (err) => {
         this.loading = false;
-        this.errorMessage = err.error?.error ?? 'Sign in failed. Please try again.';
+        this.errorMessage = err.status === 429
+          ? 'Too many sign-in attempts. Please wait a minute and try again.'
+          : err.error?.error ?? 'Sign in failed. Please try again.';
       },
     });
   }

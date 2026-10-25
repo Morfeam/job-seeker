@@ -24,6 +24,7 @@ public class CoverLetterController : ControllerBase
     private readonly IJobResultStorage _jobResultStorage;
     private readonly ICustomerStorage _customerStorage;
     private readonly IAnthropicClient _anthropicClient;
+    private readonly ILogger<CoverLetterController> _logger;
 
     public CoverLetterController(
         ICoverLetterStorage coverLetterStorage,
@@ -32,7 +33,8 @@ public class CoverLetterController : ControllerBase
         IResumeBlobStorage resumeBlobStorage,
         IJobResultStorage jobResultStorage,
         ICustomerStorage customerStorage,
-        IAnthropicClient anthropicClient)
+        IAnthropicClient anthropicClient,
+        ILogger<CoverLetterController> logger)
     {
         _coverLetterStorage = coverLetterStorage;
         _coverLetterBlobStorage = coverLetterBlobStorage;
@@ -41,6 +43,7 @@ public class CoverLetterController : ControllerBase
         _jobResultStorage = jobResultStorage;
         _customerStorage = customerStorage;
         _anthropicClient = anthropicClient;
+        _logger = logger;
     }
 
     private string? GetCustomerId() =>
@@ -119,7 +122,8 @@ public class CoverLetterController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Conflict(new { error = $"Failed to generate cover letter: {ex.Message}" });
+            _logger.LogError(ex, "Failed to generate cover letter");
+            return Conflict(new { error = "Failed to generate cover letter. Please try again." });
         }
 
         var coverLetterId = Guid.NewGuid().ToString();
@@ -131,7 +135,8 @@ public class CoverLetterController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Conflict(new { error = $"Failed to save cover letter: {ex.Message}" });
+            _logger.LogError(ex, "Failed to save cover letter");
+            return Conflict(new { error = "Failed to save cover letter. Please try again." });
         }
 
         try
@@ -142,7 +147,8 @@ public class CoverLetterController : ControllerBase
         {
             // Roll back the blob so we don't leave an orphan with no table row.
             await _coverLetterBlobStorage.DeleteAsync(customerId, coverLetterId);
-            return Conflict(new { error = $"Failed to save cover letter: {ex.Message}" });
+            _logger.LogError(ex, "Failed to save cover letter");
+            return Conflict(new { error = "Failed to save cover letter. Please try again." });
         }
 
         await _customerStorage.RecordCoverLetterAsync(customerId);

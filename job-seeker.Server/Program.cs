@@ -3,6 +3,7 @@ using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
 using job_seeker.Server.Authorization;
+using job_seeker.Server.Controllers;
 using job_seeker.Server.Operations.Ai;
 using job_seeker.Server.Operations.Email;
 using job_seeker.Server.Operations.Storage;
@@ -92,6 +93,18 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+
+    // Stricter per-IP limit for credential endpoints (sign-in, forgot-password) to slow
+    // password guessing and reset-email spam. Applied via [EnableRateLimiting(AuthRateLimitPolicy)];
+    // the global limiter above still applies on top. Same RemoteIpAddress caveat as above.
+    options.AddPolicy(CustomerController.AuthRateLimitPolicy, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(1),
             }));
 });

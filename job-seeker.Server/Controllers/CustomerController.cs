@@ -5,6 +5,7 @@ using job_seeker.Server.Operations.Email;
 using job_seeker.Server.Operations.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Text.RegularExpressions;
 
 namespace job_seeker.Server.Controllers;
@@ -13,6 +14,8 @@ namespace job_seeker.Server.Controllers;
 [Route("customer")]
 public class CustomerController : ControllerBase
 {
+    public const string AuthRateLimitPolicy = "auth";
+
     private readonly ICustomerStorage _customerStorage;
     private readonly ISendEmail _sendEmail;
     private readonly TokenHandler _tokenHandler;
@@ -75,6 +78,7 @@ public class CustomerController : ControllerBase
     }
 
     [HttpPost("sign-in")]
+    [EnableRateLimiting(AuthRateLimitPolicy)]
     public async Task<IActionResult> SignIn([FromBody] SignInRequest request)
     {
         if (!ModelState.IsValid)
@@ -92,6 +96,7 @@ public class CustomerController : ControllerBase
     }
 
     [HttpPost("forgot-password")]
+    [EnableRateLimiting(AuthRateLimitPolicy)]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         if (!ModelState.IsValid)

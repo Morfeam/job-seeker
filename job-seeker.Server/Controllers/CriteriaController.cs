@@ -13,11 +13,13 @@ public class CriteriaController : ControllerBase
 
     private readonly ICriteriaStorage _criteriaStorage;
     private readonly ICriteriaBlobStorage _criteriaBlobStorage;
+    private readonly ILogger<CriteriaController> _logger;
 
-    public CriteriaController(ICriteriaStorage criteriaStorage, ICriteriaBlobStorage criteriaBlobStorage)
+    public CriteriaController(ICriteriaStorage criteriaStorage, ICriteriaBlobStorage criteriaBlobStorage, ILogger<CriteriaController> logger)
     {
         _criteriaStorage = criteriaStorage;
         _criteriaBlobStorage = criteriaBlobStorage;
+        _logger = logger;
     }
 
     private string? GetCustomerId() =>
@@ -72,7 +74,8 @@ public class CriteriaController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Conflict(new { error = $"Failed to save criteria: {ex.Message}" });
+            _logger.LogError(ex, "Failed to save criteria");
+            return Conflict(new { error = "Failed to save criteria. Please try again." });
         }
 
         try
@@ -83,7 +86,8 @@ public class CriteriaController : ControllerBase
         {
             // Roll back the blob so we don't leave an orphan with no display name.
             await _criteriaBlobStorage.DeleteAsync(customerId, criteriaId);
-            return Conflict(new { error = $"Failed to save criteria: {ex.Message}" });
+            _logger.LogError(ex, "Failed to save criteria");
+            return Conflict(new { error = "Failed to save criteria. Please try again." });
         }
 
         return Ok();
@@ -107,7 +111,8 @@ public class CriteriaController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Conflict(new { error = $"Failed to delete criteria: {ex.Message}" });
+            _logger.LogError(ex, "Failed to delete criteria");
+            return Conflict(new { error = "Failed to delete criteria. Please try again." });
         }
 
         try
@@ -116,7 +121,8 @@ public class CriteriaController : ControllerBase
         }
         catch (Exception ex)
         {
-            return Conflict(new { error = $"Failed to delete criteria: {ex.Message}" });
+            _logger.LogError(ex, "Failed to delete criteria");
+            return Conflict(new { error = "Failed to delete criteria. Please try again." });
         }
 
         return Ok();
